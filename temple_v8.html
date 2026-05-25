@@ -1390,10 +1390,18 @@
                 return (actType === 'kadan' || actType === 'loan_given' || actType === 'varavu') && row.jsDate < fromDate;
             }).forEach(row => {
                 let currentAmt = parseFloat(row.amount || 0);
-                // கடன் கொடுத்தது → opening-ல் கழி (active அசல் மட்டும்)
-                // thirumbiyaAsalSum-ஐ கூட்டவேண்டாம் — asal_return rows preRows-ல் already கூட்டப்படும்
-                runningBalance -= currentAmt;
-                // வட்டி/அசல் — vaddi_vasool, asal_return தனி rows preRows-ல் handle ஆகுது, இங்கே skip
+                let oldAsalAmt = parseFloat(row.thirumbiyaAsalSum || 0);
+                let oldVaddiAmt= parseFloat(row.collectedVaddi || 0);
+                let hasNewAsalRows  = allRows.some(r => String(r.accounttype||'').toLowerCase().trim() === 'asal_return'  && String(r.loanRefId||'') !== '' && parseInt(r.loanRefId) === parseInt(row.id||0));
+                let hasNewVaddiRows = allRows.some(r => String(r.accounttype||'').toLowerCase().trim() === 'vaddi_vasool' && String(r.loanRefId||'') !== '' && parseInt(r.loanRefId) === parseInt(row.id||0));
+
+                // கடன் கொடுத்த மூல தொகை opening-ல் கழி
+                let loanGivenAmt = hasNewAsalRows ? currentAmt : (currentAmt + oldAsalAmt);
+                runningBalance -= loanGivenAmt;
+
+                // பழைய system: vaddi / asal tனி rows இல்லை → field-இல் இருந்து opening-ல் கூட்டு
+                if (!hasNewVaddiRows && oldVaddiAmt > 0) runningBalance += oldVaddiAmt;
+                if (!hasNewAsalRows  && oldAsalAmt  > 0) runningBalance += oldAsalAmt;
             });
 
             // helper: 8-col row builder
@@ -1434,23 +1442,23 @@
                 let name        = rowName || 'விவரமில்லை';
                 let dateStr     = row.date || '-';
                 let loanJsDate  = row.jsDate;
-                let amt         = parseFloat(row.amount || 0);
-                let thirumbiyaAsal = parseFloat(row.thirumbiyaAsalSum || 0);
-                let originalAmt = amt + thirumbiyaAsal;
-                let vaddiAmt    = parseFloat(row.collectedVaddi || 0);
+                let currentAmt  = parseFloat(row.amount || 0);
                 let loanStatus  = String(getRowValue(row, ['status'], 'Active')).toLowerCase().trim();
                 let statusLabel = loanStatus === 'active' ? '🟡 Active' : '✅ Closed';
                 let typeLabel   = rowLoanType === 'yearly' ? '📆 Yearly' : '📅 Monthly';
 
-                // வட்டி வசூல் date
-                let vaddiDateStr = row.vaddiCollectedDate || row.lastCollectedDate || dateStr;
-                let vaddiJsDate  = parseRowDate(vaddiDateStr);
-                if (isNaN(vaddiJsDate)) { vaddiDateStr = dateStr; vaddiJsDate = loanJsDate; }
+                // இந்த loan-க்கு vaddi_vasool / asal_return தனி rows இருக்கா என்று check
+                let hasNewVaddiRows = allRows.some(r => String(r.accounttype||'').toLowerCase().trim() === 'vaddi_vasool' && String(r.loanRefId||'') !== '' && parseInt(r.loanRefId) === parseInt(row.id||0));
+                let hasNewAsalRows  = allRows.some(r => String(r.accounttype||'').toLowerCase().trim() === 'asal_return'  && String(r.loanRefId||'') !== '' && parseInt(r.loanRefId) === parseInt(row.id||0));
 
-                // அசல் திரும்பிய date
-                let asalDateStr  = row.asalCollectedDate || row.lastCollectedDate || dateStr;
-                let asalJsDate   = parseRowDate(asalDateStr);
-                if (isNaN(asalJsDate)) { asalDateStr = dateStr; asalJsDate = loanJsDate; }
+                // பழைய system fallback fields
+                let oldVaddiAmt = parseFloat(row.collectedVaddi || 0);
+                let oldAsalAmt  = parseFloat(row.thirumbiyaAsalSum || 0);
+
+                // கடன் கொடுத்த மூல தொகை:
+                // புதிய → current amount மட்டும் (asal_return rows தனியா handle பண்ணும்)
+                // பழைய → current + thirumbiyaAsal (தனி rows இல்லை)
+                let loanGivenAmt = hasNewAsalRows ? currentAmt : (currentAmt + oldAsalAmt);
 
                 // 1) கடன் கொடுத்தது entry
                 if (loanJsDate >= fromDate && loanJsDate <= toDate) {
@@ -1458,26 +1466,45 @@
                         jsDate: loanJsDate,
                         type: 'loan_given',
                         render: (bal) => {
-                            let newBal = bal - originalAmt;
-                            return { bal: newBal, html: mkRow('#fff8f0', dateStr, name, typeLabel + ' கடன் — ' + statusLabel, 0, 0, 0, originalAmt, newBal) };
+                            let newBal = bal - loanGivenAmt;
+                            return { bal: newBal, html: mkRow('#fff8f0', dateStr, name, typeLabel + ' கடன் — ' + statusLabel, 0, 0, 0, loanGivenAmt, newBal) };
                         }
                     });
                 }
 
-                // 2) வட்டி வசூல் entry — vaddiCollectedDate range-ல் இருந்தால் மட்டும்
-                if (vaddiAmt > 0 && vaddiJsDate >= fromDate && vaddiJsDate <= toDate) {
-                    expandedEntries.push({
-                        jsDate: vaddiJsDate,
-                        type: 'vaddi',
-                        render: (bal) => {
-                            let newBal = bal + vaddiAmt;
-                            return { bal: newBal, html: mkRow('#f0fff4', vaddiDateStr, name, typeLabel + ' வட்டி வசூல்', 0, vaddiAmt, 0, 0, newBal) };
-                        }
-                    });
+                // 2) வட்டி வசூல் — புதிய system: vaddi_vasool rows handle பண்ணும்
+                //                   பழைய system: collectedVaddi field use பண்ணு
+                if (!hasNewVaddiRows && oldVaddiAmt > 0) {
+                    let vaddiDateStr = row.vaddiCollectedDate || row.lastCollectedDate || dateStr;
+                    let vaddiJsDate  = parseRowDate(vaddiDateStr);
+                    if (isNaN(vaddiJsDate)) { vaddiDateStr = dateStr; vaddiJsDate = loanJsDate; }
+                    if (vaddiJsDate >= fromDate && vaddiJsDate <= toDate) {
+                        expandedEntries.push({
+                            jsDate: vaddiJsDate, type: 'vaddi',
+                            render: (bal) => {
+                                let newBal = bal + oldVaddiAmt;
+                                return { bal: newBal, html: mkRow('#f0fff4', vaddiDateStr, name, typeLabel + ' வட்டி வசூல் (பழைய)', 0, oldVaddiAmt, 0, 0, newBal) };
+                            }
+                        });
+                    }
                 }
 
-                // 3) அசல் திரும்பியது — asal_return தனி rows-ல் இருந்து count ஆகுது
-                // thirumbiyaAsalSum-ஐ இங்கே use பண்ணவில்லை — double count தவிர்க்க
+                // 3) அசல் திரும்பியது — புதிய system: asal_return rows handle பண்ணும்
+                //                        பழைய system: thirumbiyaAsalSum field use பண்ணு
+                if (!hasNewAsalRows && oldAsalAmt > 0) {
+                    let asalDateStr = row.asalCollectedDate || row.lastCollectedDate || dateStr;
+                    let asalJsDate  = parseRowDate(asalDateStr);
+                    if (isNaN(asalJsDate)) { asalDateStr = dateStr; asalJsDate = loanJsDate; }
+                    if (asalJsDate >= fromDate && asalJsDate <= toDate) {
+                        expandedEntries.push({
+                            jsDate: asalJsDate, type: 'asal',
+                            render: (bal) => {
+                                let newBal = bal + oldAsalAmt;
+                                return { bal: newBal, html: mkRow('#e6f4ff', asalDateStr, name, typeLabel + ' அசல் திரும்பியது (பழைய)', oldAsalAmt, 0, 0, 0, newBal) };
+                            }
+                        });
+                    }
+                }
             });
 
             let nonLoanInRange = inRangeRows.filter(row => {
