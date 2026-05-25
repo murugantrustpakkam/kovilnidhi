@@ -199,6 +199,13 @@
                     <h4>இந்த வருட கோவில் செலவுகள்</h4>
                     <p id="dbYearSelavu" style="color: #dc3545;">₹0</p>
                 </div>
+
+                <!-- ★ Bank Balance Card -->
+                <div class="db-card full-width" style="border-top-color:#17a2b8; background:#f0fbff;">
+                    <h4>🏦 கோவில் வங்கி இருப்பு (Bank Balance)</h4>
+                    <p id="dbBankBalance" style="color:#17a2b8; font-size:22px;">₹0</p>
+                    <div class="sub-text">அமைப்புகள்-ல் தினமும் / வாரம் update பண்ணுங்கள்</div>
+                </div>
             </div>
         </div>
 
@@ -553,6 +560,13 @@
                     <input type="text" id="inputCapitalDate" placeholder="உதா: 01.04.2026" maxlength="10" oninput="formatManualDateInput(this)" style="margin-top:4px;">
                     <div id="capitalDateMsg" style="font-size:12px; color:#6c757d; margin-top:4px;"></div>
                     <button style="background:#007bff; width:100%; margin-bottom: 25px;" onclick="saveCapital()">மாற்றங்களைச் சேமி</button>
+
+                    <hr style="border:0; border-top:1px solid #eee; margin:10px 0 18px 0;">
+                    <label style="font-weight:bold; color:#17a2b8;">🏦 கோவில் வங்கி இருப்பு (Bank Balance):</label>
+                    <p style="color:#6c757d; font-size:12px; margin:4px 0 6px 0;">வங்கியில் உள்ள தொகையை தினமும் / வாரம் ஒரு முறை update பண்ணுங்கள்.</p>
+                    <input type="number" id="inputBankBalance" placeholder="உதாரணம்: 50000" style="margin-top:4px; border-color:#17a2b8;">
+                    <div id="bankBalanceMsg" style="font-size:12px; color:#6c757d; margin-top:4px;"></div>
+                    <button style="background:#17a2b8; width:100%; margin-bottom:10px;" onclick="saveBankBalance()">🏦 வங்கி இருப்பு சேமி</button>
                 </div>
                 
                 <hr style="border: 0; border-top: 1px solid #ddd; margin: 20px 0;">
@@ -852,6 +866,31 @@
         }
 
 
+        // ===== BANK BALANCE =====
+        async function saveBankBalance() {
+            let val = parseFloat(document.getElementById('inputBankBalance').value || 0);
+            if (isNaN(val) || val < 0) { toast('சரியான தொகை கொடுங்கள்!', 'warn'); return; }
+            showLoading(true, 'வங்கி இருப்பு சேமிக்கிறோம்...');
+            try {
+                let existing = allRows.find(r => String(r.accounttype||'').toLowerCase().trim() === 'app_settings' && String(r.receiverName||'').toLowerCase().trim() === 'bank_balance');
+                if (existing) {
+                    await safePost({ action: 'UPDATE', id: parseInt(existing.id), sheet1: { amount: val, date: getActiveDate() } });
+                } else {
+                    await safePost({ action: 'CREATE', sheet1: { date: getActiveDate(), receiverName: 'bank_balance', description: 'Bank Balance', amount: val, accounttype: 'app_settings', status: 'N/A', type: 'settings' } });
+                }
+                safeSetLocal('bankBalance', val);
+                let msg = document.getElementById('bankBalanceMsg');
+                if (msg) msg.innerHTML = '<span style="color:#17a2b8;font-weight:bold;">✅ சேமிக்கப்பட்டது: ₹' + val.toLocaleString('en-IN') + '</span>';
+                let dbBB = document.getElementById('dbBankBalance');
+                if (dbBB) dbBB.innerText = '₹' + val.toLocaleString('en-IN');
+                await fetchDocs(true);
+                toast('✅ வங்கி இருப்பு சேமிக்கப்பட்டது! ₹' + val.toLocaleString('en-IN'), 'info');
+            } catch(err) {
+                toast('சேமிப்பதில் சிக்கல்!', 'error');
+            }
+            showLoading(false);
+        }
+
         // ===== TEMPLE DETAILS =====
         async function saveTempleDetails() {
             let name  = (document.getElementById('inputTempleName').value || '').trim();
@@ -972,62 +1011,79 @@
                 return;
             }
             showLoading(true, 'தரவுகளை பெறுகிறோம்...');
-            try {
-                let response = await fetch(scriptUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({ action: 'GET_DATA' })
-                });
-                let data = await response.json();
-                allRows = data.sheet1 || [];
-                lastFetchTime = Date.now();
+            let retries = 3;
+            for (let attempt = 1; attempt <= retries; attempt++) {
+                try {
+                    let response = await fetch(scriptUrl, {
+                        method: 'POST',
+                        body: JSON.stringify({ action: 'GET_DATA' }),
+                        headers: { 'Content-Type': 'text/plain' }
+                    });
+                    if (!response.ok) throw new Error('HTTP ' + response.status);
+                    let data = await response.json();
+                    if (!data || !data.sheet1) throw new Error('Data empty');
+                    allRows = data.sheet1 || [];
+                    lastFetchTime = Date.now();
 
-                // ★ Sheets-இல் இருந்து capital settings load
-                let capitalRow = allRows.find(r => String(r.accounttype||'').toLowerCase().trim() === 'app_settings' && String(r.receiverName||'').toLowerCase().trim() === 'capital');
-                if (capitalRow) {
-                    let capVal  = parseFloat(capitalRow.amount || 0);
-                    let capDate = String(capitalRow.description || capitalRow.date || '');
-                    myCapital = capVal;
-                    safeSetLocal('myCapital', capVal);
-                    safeSetLocal('myCapitalDate', capDate);
-                    let capInput = document.getElementById('inputCapital');
-                    let capDateInput = document.getElementById('inputCapitalDate');
-                    let capMsg = document.getElementById('capitalDateMsg');
-                    if (capInput) capInput.value = capVal;
-                    if (capDateInput && capDate) capDateInput.value = capDate;
-                    if (capMsg && capVal > 0) capMsg.innerHTML = '<span style="color:#28a745;font-weight:bold;">✅ தற்போதைய முதலீடு: ₹' + capVal.toLocaleString('en-IN') + (capDate ? ' | தேதி: ' + capDate : '') + '</span>';
-                } else {
-                    myCapital = parseFloat(safeGetLocal('myCapital', '0') || 0);
+                    // ★ Sheets-இல் இருந்து capital settings load
+                    let capitalRow = allRows.find(r => String(r.accounttype||'').toLowerCase().trim() === 'app_settings' && String(r.receiverName||'').toLowerCase().trim() === 'capital');
+                    if (capitalRow) {
+                        let capVal  = parseFloat(capitalRow.amount || 0);
+                        let capDate = String(capitalRow.description || capitalRow.date || '');
+                        myCapital = capVal;
+                        safeSetLocal('myCapital', capVal);
+                        safeSetLocal('myCapitalDate', capDate);
+                        let capInput     = document.getElementById('inputCapital');
+                        let capDateInput = document.getElementById('inputCapitalDate');
+                        let capMsg       = document.getElementById('capitalDateMsg');
+                        if (capInput) capInput.value = capVal;
+                        if (capDateInput && capDate) capDateInput.value = capDate;
+                        if (capMsg && capVal > 0) capMsg.innerHTML = '<span style="color:#28a745;font-weight:bold;">✅ தற்போதைய முதலீடு: ₹' + capVal.toLocaleString('en-IN') + (capDate ? ' | தேதி: ' + capDate : '') + '</span>';
+                    } else {
+                        myCapital = parseFloat(safeGetLocal('myCapital', '0') || 0);
+                    }
+
+                    // ★ Bank balance settings load
+                    let bankRow = allRows.find(r => String(r.accounttype||'').toLowerCase().trim() === 'app_settings' && String(r.receiverName||'').toLowerCase().trim() === 'bank_balance');
+                    if (bankRow) {
+                        safeSetLocal('bankBalance', String(bankRow.amount || 0));
+                        let bbInput = document.getElementById('inputBankBalance');
+                        if (bbInput) bbInput.value = parseFloat(bankRow.amount || 0);
+                    }
+
+                    // ★ Sheets-இல் இருந்து temple details load
+                    let templeRow = allRows.find(r => String(r.accounttype||'').toLowerCase().trim() === 'app_settings' && String(r.receiverName||'').toLowerCase().trim() === 'temple_details');
+                    if (templeRow) {
+                        let tName  = String(templeRow.status || '');
+                        let tDesc  = String(templeRow.description || '');
+                        let tParts = tDesc.split('||');
+                        safeSetLocal('templeName',  tName);
+                        safeSetLocal('templeAddr1', tParts[0] || '');
+                        safeSetLocal('templeAddr2', tParts[1] || '');
+                        loadTempleDetailsUI();
+                    }
+
+                    // app_settings rows-ஐ dashboard-ல் இருந்து filter பண்ணு
+                    let dataRows = allRows.filter(r => String(r.accounttype||'').toLowerCase().trim() !== 'app_settings');
+
+                    calculateDashboard(dataRows);
+                    renderLoanData();
+                    renderCashbookData();
+                    updateCustomerDropdownList();
+                    let page5 = document.getElementById('page5');
+                    if (page5 && page5.classList.contains('active')) generateBankStatement();
+                    showLoading(false);
+                    return; // success — loop break
+                } catch (error) {
+                    console.error('Attempt ' + attempt + ' failed:', error);
+                    if (attempt === retries) {
+                        toast('தரவுகளைப் பெறுவதில் சிக்கல்! இணைப்பை சரிபார்க்கவும்.', 'error');
+                    } else {
+                        await new Promise(r => setTimeout(r, 1500 * attempt));
+                    }
                 }
-
-                // ★ Sheets-இல் இருந்து temple details load
-                let templeRow = allRows.find(r => String(r.accounttype||'').toLowerCase().trim() === 'app_settings' && String(r.receiverName||'').toLowerCase().trim() === 'temple_details');
-                if (templeRow) {
-                    let tName  = String(templeRow.status || '');
-                    let tDesc  = String(templeRow.description || '');
-                    let tParts = tDesc.split('||');
-                    safeSetLocal('templeName',  tName);
-                    safeSetLocal('templeAddr1', tParts[0] || '');
-                    safeSetLocal('templeAddr2', tParts[1] || '');
-                    loadTempleDetailsUI();
-                }
-
-                // app_settings rows-ஐ dashboard-ல் இருந்து filter பண்ணு
-                let dataRows = allRows.filter(r => String(r.accounttype||'').toLowerCase().trim() !== 'app_settings');
-
-                calculateDashboard(dataRows);
-                renderLoanData();
-                renderCashbookData();
-                updateCustomerDropdownList();
-                let page5 = document.getElementById('page5');
-                if (page5 && page5.classList.contains('active')) {
-                    generateBankStatement();
-                }
-            } catch (error) {
-                console.error(error);
-                toast('தரவுகளைப் பெறுவதில் சிக்கல்! மீண்டும் முயற்சிக்கவும்.', 'error');
-            } finally {
-                showLoading(false);
             }
+            showLoading(false);
         }
 
         function getRowValue(row, possibleKeys, defaultValue = 0) {
@@ -1163,11 +1219,13 @@
             if (cmEl) cmEl.innerText = '₹' + cycleVaddiMonthly.toLocaleString('en-IN');
             if (cyEl) cyEl.innerText = '₹' + cycleVaddiYearly.toLocaleString('en-IN');
 
-            // Year vaddi breakdown
+            // Year vaddi breakdown — proportional split
             let ymEl = document.getElementById('dbYearMonthly');
             let yyEl = document.getElementById('dbYearYearly');
-            if (ymEl) ymEl.innerText = '₹' + Math.max(0, yearVaddiMonthly - yearlyVaddiBase * (yearVaddiMonthly / (totalVattiEarnedAllTime || 1))).toLocaleString('en-IN');
-            if (yyEl) yyEl.innerText = '₹' + currentYearVaddi.toLocaleString('en-IN');
+            let yearVaddiMonthlyNet = Math.max(0, yearVaddiMonthly - (yearlyVaddiBase * (totalVattiEarnedAllTime > 0 ? yearVaddiMonthly / totalVattiEarnedAllTime : 0)));
+            let yearVaddiYearlyNet  = Math.max(0, yearVaddiYearly  - (yearlyVaddiBase * (totalVattiEarnedAllTime > 0 ? yearVaddiYearly  / totalVattiEarnedAllTime : 0)));
+            if (ymEl) ymEl.innerText = '₹' + Math.round(yearVaddiMonthlyNet).toLocaleString('en-IN');
+            if (yyEl) yyEl.innerText = '₹' + Math.round(yearVaddiYearlyNet).toLocaleString('en-IN');
 
             // Sub-text labels update
             let cycleInfo = document.getElementById('dbCycleResetInfo');
@@ -1183,6 +1241,12 @@
             document.getElementById('dbVaddiYear').innerText        = '₹' + currentYearVaddi.toLocaleString('en-IN');
             document.getElementById('dbIdharVaravuYear').innerText   = '₹' + currentYearVaravu.toLocaleString('en-IN');
             document.getElementById('dbYearSelavu').innerText        = '₹' + currentYearSelavu.toLocaleString('en-IN');
+
+            // ★ Bank Balance — Sheets-இல் இருந்து load (fetchDocs-ல் set ஆகும்)
+            let bbRow = (typeof allRows !== 'undefined' ? allRows : []).find(r => String(r.accounttype||'').toLowerCase().trim() === 'app_settings' && String(r.receiverName||'').toLowerCase().trim() === 'bank_balance');
+            let bbVal = bbRow ? parseFloat(bbRow.amount || 0) : parseFloat(safeGetLocal('bankBalance', '0') || 0);
+            let dbBB = document.getElementById('dbBankBalance');
+            if (dbBB) dbBB.innerText = '₹' + bbVal.toLocaleString('en-IN');
         }
 
         function handleViewModeChange() {
