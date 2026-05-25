@@ -152,28 +152,42 @@
                 <div class="db-card full-width-green">
                     <h4>கோவிலில் உள்ள இருப்பு நிதி (Cash In Hand)</h4>
                     <p id="dbTotal" style="color: #28a745; font-size: 22px;">₹0</p>
-                    <div class="sub-text">(ஆரம்ப முதலீடு + வந்த வட்டி + இதர வரவு - செலவு - கொடுக்கப்பட்ட கடன்)</div>
+                    <div class="sub-text">(ஆரம்ப முதலீடு + வந்த வட்டி + திரும்பிய அசல் + இதர வரவு - செலவு - கொடுக்கப்பட்ட கடன்)</div>
                 </div>
 
                 <div class="db-card orange" style="grid-column: span 2;">
                     <h4>வட்டிக்கு விடப்பட்ட அசல் கடன் (தற்போதைய நிலுவை)</h4>
-                    <p id="dbGiven">₹0</p>
+                    <p id="dbGiven" style="margin-bottom:6px;">₹0</p>
+                    <div style="display:flex;justify-content:center;gap:12px;flex-wrap:wrap;">
+                        <span style="font-size:13px;background:#fff3cd;color:#856404;padding:4px 14px;border-radius:8px;font-weight:bold;">📅 Monthly: <span id="dbGivenMonthly">₹0</span></span>
+                        <span style="font-size:13px;color:#aaa;padding:4px 0;">+</span>
+                        <span style="font-size:13px;background:#e8f4ff;color:#2c5282;padding:4px 14px;border-radius:8px;font-weight:bold;">📆 Yearly: <span id="dbGivenYearly">₹0</span></span>
+                    </div>
                 </div>
 
                 <div class="db-card purple">
                     <h4>இந்த 25 நாள் சுழற்சி வட்டி</h4>
-                    <p id="dbVaddiMonth" style="color: #6f42c1;">₹0</p>
-                    <div class="sub-text" id="dbCycleResetInfo">Reset தேதி இல்லை</div>
+                    <p id="dbVaddiMonth" style="color: #6f42c1; margin-bottom:4px;">₹0</p>
+                    <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap;">
+                        <span style="font-size:12px;background:#f3e8ff;color:#6f42c1;padding:3px 10px;border-radius:6px;">📅 <strong id="dbCycleMonthly">₹0</strong></span>
+                        <span style="font-size:12px;color:#aaa;">+</span>
+                        <span style="font-size:12px;background:#e8f4ff;color:#2c5282;padding:3px 10px;border-radius:6px;">📆 <strong id="dbCycleYearly">₹0</strong></span>
+                    </div>
+                    <div class="sub-text" id="dbCycleResetInfo" style="margin-top:4px;">Reset தேதி இல்லை</div>
                 </div>
                 <div class="db-card purple">
                     <h4>இந்த வருட வட்டி வரவு</h4>
-                    <p id="dbVaddiYear" style="color: #6f42c1;">₹0</p>
+                    <p id="dbVaddiYear" style="color: #6f42c1; margin-bottom:4px;">₹0</p>
+                    <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap;">
+                        <span style="font-size:12px;background:#f3e8ff;color:#6f42c1;padding:3px 10px;border-radius:6px;">📅 <strong id="dbYearMonthly">₹0</strong></span>
+                        <span style="font-size:12px;color:#aaa;">+</span>
+                        <span style="font-size:12px;background:#e8f4ff;color:#2c5282;padding:3px 10px;border-radius:6px;">📆 <strong id="dbYearYearly">₹0</strong></span>
+                    </div>
                 </div>
 
                 <div class="db-card green">
                     <h4>இந்த மாத இதர வரவு (நன்கொடை)</h4>
                     <p id="dbIdharVaravuMonth" style="color: #28a745;">₹0</p>
-                    <div class="sub-text" id="dbCurMonthInfo"></div>
                 </div>
                 <div class="db-card green">
                     <h4>இந்த வருட இதர வரவு (நன்கொடை)</h4>
@@ -183,7 +197,6 @@
                 <div class="db-card danger">
                     <h4>இந்த மாத கோவில் செலவுகள்</h4>
                     <p id="dbMonthSelavu" style="color: #dc3545;">₹0</p>
-                    <div class="sub-text" id="dbCurMonthSelavuInfo"></div>
                 </div>
                 <div class="db-card danger">
                     <h4>இந்த வருட கோவில் செலவுகள்</h4>
@@ -813,61 +826,35 @@
             }, 2800);
         }
 
-        async function saveCapital() {
+        function saveCapital() {
             let capValue = parseFloat(document.getElementById('inputCapital').value || 0);
             if (!capValue || capValue <= 0) { toast('சரியான தொகை கொடுங்கள்!', 'warn'); return; }
             let capDate = (document.getElementById('inputCapitalDate').value || '').trim();
             if (capDate && !isValidDate(capDate)) { toast('சரியான தேதி கொடுங்கள்! (DD.MM.YYYY உதா: 01.04.2026)', 'warn'); return; }
-            if (!capDate) capDate = getActiveDate();
-            showLoading(true, 'முதலீடு சேமிக்கிறோம்...');
-            try {
-                // Sheets-ல் app_settings row இருக்கா check பண்ணு
-                let existing = allRows.find(r => String(r.accounttype||'').toLowerCase().trim() === 'app_settings' && String(r.receiverName||'').toLowerCase().trim() === 'capital');
-                if (existing) {
-                    await safePost({ action: 'UPDATE', id: parseInt(existing.id), sheet1: { amount: capValue, date: capDate, description: capDate } });
-                } else {
-                    await safePost({ action: 'CREATE', sheet1: { date: capDate, receiverName: 'capital', description: capDate, amount: capValue, accounttype: 'app_settings', status: 'N/A', type: 'settings' } });
-                }
-                safeSetLocal('myCapital', capValue);
-                safeSetLocal('myCapitalDate', capDate);
-                myCapital = capValue;
-                let msg = document.getElementById('capitalDateMsg');
-                if (msg) msg.innerHTML = '<span style="color:#28a745;font-weight:bold;">✅ சேமிக்கப்பட்டது — தொகை: ₹' + capValue.toLocaleString('en-IN') + ' | தேதி: ' + capDate + '</span>';
-                await fetchDocs(true);
-                toast('✅ கோவில் ஆரம்ப முதலீடு சேமிக்கப்பட்டது! ₹' + capValue.toLocaleString('en-IN'), 'info');
-            } catch(err) {
-                toast('சேமிப்பதில் சிக்கல்!', 'error');
-            }
-            showLoading(false);
+            if (!capDate) capDate = getActiveDate(); // date இல்லன்னா today
+            safeSetLocal('myCapital', capValue);
+            safeSetLocal('myCapitalDate', capDate);
+            myCapital = capValue;
+            // Update msg
+            let msg = document.getElementById('capitalDateMsg');
+            if (msg) msg.innerHTML = '<span style="color:#28a745;font-weight:bold;">✅ சேமிக்கப்பட்டது — தொகை: ₹' + capValue.toLocaleString('en-IN') + ' | தேதி: ' + capDate + '</span>';
+            calculateDashboard(allRows);
+            toast('✅ கோவில் ஆரம்ப முதலீடு சேமிக்கப்பட்டது! ₹' + capValue.toLocaleString('en-IN') + ' — ' + capDate, 'info');
         }
 
 
         // ===== TEMPLE DETAILS =====
-        async function saveTempleDetails() {
+        function saveTempleDetails() {
             let name  = (document.getElementById('inputTempleName').value || '').trim();
             let addr1 = (document.getElementById('inputTempleAddr1').value || '').trim();
             let addr2 = (document.getElementById('inputTempleAddr2').value || '').trim();
             if (!name) { toast('கோவில் பெயர் கொடுங்கள்!', 'warn'); return; }
-            showLoading(true, 'கோவில் விவரங்கள் சேமிக்கிறோம்...');
-            try {
-                let existing = allRows.find(r => String(r.accounttype||'').toLowerCase().trim() === 'app_settings' && String(r.receiverName||'').toLowerCase().trim() === 'temple_details');
-                let payload = { date: getActiveDate(), receiverName: 'temple_details', description: addr1 + '||' + addr2, amount: 0, accounttype: 'app_settings', status: name, type: 'settings' };
-                if (existing) {
-                    await safePost({ action: 'UPDATE', id: parseInt(existing.id), sheet1: payload });
-                } else {
-                    await safePost({ action: 'CREATE', sheet1: payload });
-                }
-                safeSetLocal('templeName', name);
-                safeSetLocal('templeAddr1', addr1);
-                safeSetLocal('templeAddr2', addr2);
-                let msg = document.getElementById('templeDetailMsg');
-                if (msg) msg.innerHTML = '✅ சேமிக்கப்பட்டது!';
-                await fetchDocs(true);
-                toast('✅ கோவில் விவரங்கள் சேமிக்கப்பட்டது!', 'info');
-            } catch(err) {
-                toast('சேமிப்பதில் சிக்கல்!', 'error');
-            }
-            showLoading(false);
+            safeSetLocal('templeName', name);
+            safeSetLocal('templeAddr1', addr1);
+            safeSetLocal('templeAddr2', addr2);
+            let msg = document.getElementById('templeDetailMsg');
+            if (msg) msg.innerHTML = '✅ சேமிக்கப்பட்டது!';
+            toast('✅ கோவில் விவரங்கள் சேமிக்கப்பட்டது!', 'info');
         }
 
         function loadTempleDetailsUI() {
@@ -932,79 +919,22 @@
         }
 
         let lastFetchTime = 0;
-
-        // ★ SAFE POST — sequential, with retry (race condition fix)
-        async function safePost(payload, retries = 3, delayMs = 600) {
-            for (let attempt = 1; attempt <= retries; attempt++) {
-                try {
-                    let res = await fetch(scriptUrl, {
-                        method: 'POST',
-                        body: JSON.stringify(payload)
-                    });
-                    let data = await res.json();
-                    if (data.status === 'error') throw new Error(data.message || 'GAS error');
-                    return data;
-                } catch (err) {
-                    console.warn('safePost attempt ' + attempt + ' failed:', err);
-                    if (attempt === retries) throw err;
-                    // Next retry-க்கு முன் delay
-                    await new Promise(r => setTimeout(r, delayMs * attempt));
-                }
-            }
-        }
-
         async function fetchDocs(force = false) {
             let now = Date.now();
+            // 8 seconds-க்குள் மீண்டும் fetch வேண்டாம் (force இல்லன்னா)
             if (!force && (now - lastFetchTime) < 8000 && allRows.length > 0) {
-                calculateDashboard(allRows.filter(r => String(r.accounttype||'').toLowerCase().trim() !== 'app_settings'));
+                calculateDashboard(allRows);
                 renderLoanData();
                 renderCashbookData();
                 return;
             }
-            showLoading(true, 'தரவுகளை பெறுகிறோம்...');
+            showLoading(true);
             try {
-                let response = await fetch(scriptUrl, {
-                    method: 'POST',
-                    body: JSON.stringify({ action: 'GET_DATA' })
-                });
+                let response = await fetch(scriptUrl);
                 let data = await response.json();
                 allRows = data.sheet1 || [];
                 lastFetchTime = Date.now();
-
-                // ★ Sheets-இல் இருந்து capital settings load
-                let capitalRow = allRows.find(r => String(r.accounttype||'').toLowerCase().trim() === 'app_settings' && String(r.receiverName||'').toLowerCase().trim() === 'capital');
-                if (capitalRow) {
-                    let capVal  = parseFloat(capitalRow.amount || 0);
-                    let capDate = String(capitalRow.description || capitalRow.date || '');
-                    myCapital = capVal;
-                    safeSetLocal('myCapital', capVal);
-                    safeSetLocal('myCapitalDate', capDate);
-                    let capInput = document.getElementById('inputCapital');
-                    let capDateInput = document.getElementById('inputCapitalDate');
-                    let capMsg = document.getElementById('capitalDateMsg');
-                    if (capInput) capInput.value = capVal;
-                    if (capDateInput && capDate) capDateInput.value = capDate;
-                    if (capMsg && capVal > 0) capMsg.innerHTML = '<span style="color:#28a745;font-weight:bold;">✅ தற்போதைய முதலீடு: ₹' + capVal.toLocaleString('en-IN') + (capDate ? ' | தேதி: ' + capDate : '') + '</span>';
-                } else {
-                    myCapital = parseFloat(safeGetLocal('myCapital', '0') || 0);
-                }
-
-                // ★ Sheets-இல் இருந்து temple details load
-                let templeRow = allRows.find(r => String(r.accounttype||'').toLowerCase().trim() === 'app_settings' && String(r.receiverName||'').toLowerCase().trim() === 'temple_details');
-                if (templeRow) {
-                    let tName  = String(templeRow.status || '');
-                    let tDesc  = String(templeRow.description || '');
-                    let tParts = tDesc.split('||');
-                    safeSetLocal('templeName',  tName);
-                    safeSetLocal('templeAddr1', tParts[0] || '');
-                    safeSetLocal('templeAddr2', tParts[1] || '');
-                    loadTempleDetailsUI();
-                }
-
-                // app_settings rows-ஐ dashboard-ல் இருந்து filter பண்ணு
-                let dataRows = allRows.filter(r => String(r.accounttype||'').toLowerCase().trim() !== 'app_settings');
-
-                calculateDashboard(dataRows);
+                calculateDashboard(allRows);
                 renderLoanData();
                 renderCashbookData();
                 updateCustomerDropdownList();
@@ -1012,9 +942,9 @@
                 if (page5 && page5.classList.contains('active')) {
                     generateBankStatement();
                 }
-            } catch (error) {
-                console.error(error);
-                toast('தரவுகளைப் பெறுவதில் சிக்கல்! மீண்டும் முயற்சிக்கவும்.', 'error');
+            } catch (error) { 
+                console.error(error); 
+                alert('தரவுகளைப் பெறுவதில் சிக்கல்!');
             } finally {
                 showLoading(false);
             }
@@ -1049,97 +979,101 @@
 
         // CORRECTED DASHBOARD MATHEMATICS FOR LIQUID CASH IN HAND
         function calculateDashboard(rows) {
-            let yearlyVaddiBase  = parseFloat(safeGetLocal('yearlyVaddiBase',  '0') || 0);
+            let cycleVaddiBase = parseFloat(safeGetLocal('cycleVaddiBase', '0') || 0);
+            let cycleVaravuBase = parseFloat(safeGetLocal('cycleVaravuBase', '0') || 0);
+            let cycleSelavuBase = parseFloat(safeGetLocal('cycleSelavuBase', '0') || 0);
+            let yearlyVaddiBase = parseFloat(safeGetLocal('yearlyVaddiBase', '0') || 0);
             let yearlyVaravuBase = parseFloat(safeGetLocal('yearlyVaravuBase', '0') || 0);
             let yearlySelavuBase = parseFloat(safeGetLocal('yearlySelavuBase', '0') || 0);
 
-            // ★ 25-நாள் சுழற்சி reset தேதி — இந்த தேதிக்கு பிறகு உள்ள vaddi_vasool மட்டும் count
-            let cycleResetDateStr = safeGetLocal('cycleResetDate', '');
-            let cycleResetDate = cycleResetDateStr ? parseRowDate(cycleResetDateStr) : null;
-
-            // ★ Current calendar month (active date or today)
-            let activeDateStr = getActiveDate(); // DD.MM.YYYY
-            let activeParsed  = parseRowDate(activeDateStr);
-            let curMonth = (!isNaN(activeParsed) && activeParsed instanceof Date) ? activeParsed.getMonth()     : new Date().getMonth();
-            let curYear  = (!isNaN(activeParsed) && activeParsed instanceof Date) ? activeParsed.getFullYear() : new Date().getFullYear();
-
-            let totalVattiEarnedAllTime = 0;
-            let totalVaravuAllTime      = 0;   // நன்கொடை மட்டும்
-            let totalAsalReturnAllTime  = 0;   // அசல் திரும்பியது
-            let totalSelavuAllTime      = 0;
+            let totalVattiEarnedAllTime = 0;        
+            let totalVaravuAllTime = 0;      // நன்கொடை மட்டும்
+            let totalAsalReturnAllTime = 0;  // அசல் திரும்பியது (தனியா track)
+            let totalSelavuAllTime = 0;
             let currentLoansActiveOutstanding = 0;
-
-            // ★ Date-based counters for 3 dashboard cards
-            let cycleVaddi  = 0;   // 25-நாள் சுழற்சி reset-க்கு பிறகு வட்டி வசூல்
-            let monthVaravu = 0;   // இந்த calendar month நன்கொடை
-            let monthSelavu = 0;   // இந்த calendar month செலவுகள்
+            let monthlyLoansOutstanding = 0;
+            let yearlyLoansOutstanding  = 0;
+            let cycleVaddi = 0, cycleVaddiMonthly = 0, cycleVaddiYearly = 0;
+            let yearVaddiMonthly = 0, yearVaddiYearly = 0;
 
             rows.forEach(row => {
-                let amt     = parseFloat(getRowValue(row, ['amount'],      0));
-                let status  = String(getRowValue(row, ['status'],          'Active')).toLowerCase().trim();
-                let actType = String(getRowValue(row, ['accounttype'],     'kadan')).toLowerCase().trim();
-                let rowDate = parseRowDate(row.date);
-                let rdValid = (rowDate instanceof Date) && !isNaN(rowDate);
+                let amt = parseFloat(getRowValue(row, ['amount'], 0));
+                let status = String(getRowValue(row, ['status'], 'Active')).toLowerCase().trim();
+                let actType = String(getRowValue(row, ['accounttype'], 'kadan')).toLowerCase().trim();
 
-                if (actType === 'kadan' || actType === 'varavu') {
-                    if (status === 'active') currentLoansActiveOutstanding += amt;
-                } else if (actType === 'vaddi_vasool') {
+                if(actType === 'kadan' || actType === 'varavu') {
+                    if(status === 'active') {
+                        currentLoansActiveOutstanding += amt;
+                        let lt = String(getRowValue(row, ['loanType'], 'monthly')).toLowerCase().trim();
+                        if (lt === 'yearly') yearlyLoansOutstanding  += amt;
+                        else                 monthlyLoansOutstanding += amt;
+                    }
+                } else if(actType === 'vaddi_vasool') {
                     totalVattiEarnedAllTime += amt;
-                    // cycleResetDate-க்கு பிறகு (அல்லது reset set பண்ணவில்லை என்றால் எல்லாமே) count
-                    if (!cycleResetDate || !isNaN(cycleResetDate) && rdValid && rowDate >= cycleResetDate) {
+                    let lt = String(getRowValue(row, ['loanType'], 'monthly')).toLowerCase().trim();
+                    let isYrly = lt === 'yearly';
+                    if (isYrly) yearVaddiYearly  += amt; else yearVaddiMonthly += amt;
+                    let rdValid2 = (rowDate instanceof Date) && !isNaN(rowDate);
+                    if (!cycleResetDate || (!isNaN(cycleResetDate) && rdValid2 && rowDate >= cycleResetDate)) {
                         cycleVaddi += amt;
+                        if (isYrly) cycleVaddiYearly += amt; else cycleVaddiMonthly += amt;
                     }
-                } else if (actType === 'asal_return') {
+                } else if(actType === 'asal_return') {
+                    // அசல் திரும்பியது — நன்கொடை-ல் சேர்க்காதே, தனியா வை
                     totalAsalReturnAllTime += amt;
-                } else if (actType === 'nankodai' || actType === 'varavu_idhar' || actType === 'varavu idhar') {
+                } else if(actType === 'nankodai' || actType === 'varavu_idhar' || actType === 'varavu idhar') {
                     totalVaravuAllTime += amt;
-                    // ★ இந்த calendar month மட்டும்
-                    if (rdValid && rowDate.getMonth() === curMonth && rowDate.getFullYear() === curYear) {
-                        monthVaravu += amt;
-                    }
-                } else if (actType === 'sela_porul' || actType === 'selavu') {
+                } else if(actType === 'sela_porul' || actType === 'selavu') {
                     totalSelavuAllTime += amt;
-                    // ★ இந்த calendar month மட்டும்
-                    if (rdValid && rowDate.getMonth() === curMonth && rowDate.getFullYear() === curYear) {
-                        monthSelavu += amt;
-                    }
                 }
             });
 
-            // Yearly totals (yearly reset button ஆளுகை)
-            let currentYearVaddi  = totalVattiEarnedAllTime - yearlyVaddiBase;  if (currentYearVaddi  < 0) currentYearVaddi  = 0;
-            let currentYearVaravu = totalVaravuAllTime      - yearlyVaravuBase; if (currentYearVaravu < 0) currentYearVaravu = 0;
-            let currentYearSelavu = totalSelavuAllTime      - yearlySelavuBase; if (currentYearSelavu < 0) currentYearSelavu = 0;
+            let currentCycleVaddi  = totalVattiEarnedAllTime - cycleVaddiBase;  if(currentCycleVaddi  < 0) currentCycleVaddi  = 0;
+            let currentCycleVaravu = totalVaravuAllTime - cycleVaravuBase;       if(currentCycleVaravu < 0) currentCycleVaravu = 0;
+            let currentCycleSelavu = totalSelavuAllTime - cycleSelavuBase;       if(currentCycleSelavu < 0) currentCycleSelavu = 0;
+
+            let currentYearVaddi  = totalVattiEarnedAllTime - yearlyVaddiBase;  if(currentYearVaddi  < 0) currentYearVaddi  = 0;
+            let currentYearVaravu = totalVaravuAllTime - yearlyVaravuBase;       if(currentYearVaravu < 0) currentYearVaravu = 0;
+            let currentYearSelavu = totalSelavuAllTime - yearlySelavuBase;       if(currentYearSelavu < 0) currentYearSelavu = 0;
 
             // மொத்த நிதி = capital + வட்டி + நன்கொடை + அசல்திரும்பியது - செலவு
-            let nivaMoththaNithiFormulaValue = myCapital + totalVattiEarnedAllTime + totalVaravuAllTime - totalSelavuAllTime;
-
-            // Liquid Cash In Hand
+            let nivaMoththaNithiFormulaValue = myCapital + totalVattiEarnedAllTime + totalVaravuAllTime + totalAsalReturnAllTime - totalSelavuAllTime;
+            
+            // Fixed Cash In Hand Formula: Liquid Money available in Hand right now
             let cashInHand = nivaMoththaNithiFormulaValue - currentLoansActiveOutstanding;
 
-            document.getElementById('dbMoththaNithiFormula').innerText = '₹' + nivaMoththaNithiFormulaValue.toLocaleString('en-IN');
-            document.getElementById('dbTotal').innerText               = '₹' + cashInHand.toLocaleString('en-IN');
-            document.getElementById('dbGiven').innerText               = '₹' + currentLoansActiveOutstanding.toLocaleString('en-IN');
+            document.getElementById('dbMoththaNithiFormula').innerText = '₹' + nivaMoththaNithiFormulaValue;
+            document.getElementById('dbTotal').innerText = '₹' + cashInHand;
+            document.getElementById('dbGiven').innerText = '₹' + currentLoansActiveOutstanding;
+            // அசல் கடன் — Monthly / Yearly breakdown
+            let givenM = document.getElementById('dbGivenMonthly');
+            let givenY = document.getElementById('dbGivenYearly');
+            if (givenM) givenM.innerText = '₹' + monthlyLoansOutstanding.toLocaleString('en-IN');
+            if (givenY) givenY.innerText = '₹' + yearlyLoansOutstanding.toLocaleString('en-IN');
 
-            // ★ 3 date-based cards (localStorage base-ஐ நம்பவில்லை)
-            document.getElementById('dbVaddiMonth').innerText       = '₹' + cycleVaddi.toLocaleString('en-IN');
-            document.getElementById('dbIdharVaravuMonth').innerText  = '₹' + monthVaravu.toLocaleString('en-IN');
-            document.getElementById('dbMonthSelavu').innerText       = '₹' + monthSelavu.toLocaleString('en-IN');
+            // 25 நாள் cycle வட்டி — total + breakdown
+            document.getElementById('dbVaddiMonth').innerText = '₹' + cycleVaddi.toLocaleString('en-IN');
+            let cM = document.getElementById('dbCycleMonthly');
+            let cY = document.getElementById('dbCycleYearly');
+            if (cM) cM.innerText = '₹' + cycleVaddiMonthly.toLocaleString('en-IN');
+            if (cY) cY.innerText = '₹' + cycleVaddiYearly.toLocaleString('en-IN');
 
-            // Sub-text labels update
-            let cycleInfo = document.getElementById('dbCycleResetInfo');
-            if (cycleInfo) cycleInfo.innerText = cycleResetDateStr ? ('Reset: ' + cycleResetDateStr + ' முதல்') : 'Reset தேதி இல்லை — அனைத்து வட்டியும்';
-            let tamilMonths = ['ஜனவரி','பிப்ரவரி','மார்ச்','ஏப்ரல்','மே','ஜூன்','ஜூலை','ஆகஸ்ட்','செப்டம்பர்','அக்டோபர்','நவம்பர்','டிசம்பர்'];
-            let monthLabel = tamilMonths[curMonth] + ' ' + curYear;
-            let mInfo = document.getElementById('dbCurMonthInfo');
-            if (mInfo) mInfo.innerText = monthLabel;
-            let msInfo = document.getElementById('dbCurMonthSelavuInfo');
-            if (msInfo) msInfo.innerText = monthLabel;
+            // வருட வட்டி — total + breakdown
+            let yearVaddiBase = parseFloat(safeGetLocal('yearlyVaddiBase','0'))||0;
+            let yearVaddiTotal = Math.max(0, (yearVaddiMonthly + yearVaddiYearly) - yearVaddiBase);
+            let yMNet = Math.max(0, yearVaddiMonthly - yearVaddiBase);
+            let yYNet = yearVaddiYearly; // yearly வட்டி yearly reset base-ல் சேர்க்கலை
+            document.getElementById('dbVaddiYear').innerText = '₹' + yearVaddiTotal.toLocaleString('en-IN');
+            let yrM = document.getElementById('dbYearMonthly');
+            let yrY = document.getElementById('dbYearYearly');
+            if (yrM) yrM.innerText = '₹' + yMNet.toLocaleString('en-IN');
+            if (yrY) yrY.innerText = '₹' + yYNet.toLocaleString('en-IN');
 
-            // Yearly cards (yearly reset base — unchanged)
-            document.getElementById('dbVaddiYear').innerText        = '₹' + currentYearVaddi.toLocaleString('en-IN');
-            document.getElementById('dbIdharVaravuYear').innerText   = '₹' + currentYearVaravu.toLocaleString('en-IN');
-            document.getElementById('dbYearSelavu').innerText        = '₹' + currentYearSelavu.toLocaleString('en-IN');
+            // மாத / வருட வரவு + செலவு
+            document.getElementById('dbIdharVaravuMonth').innerText = '₹' + currentCycleVaravu;
+            document.getElementById('dbIdharVaravuYear').innerText  = '₹' + currentYearVaravu;
+            document.getElementById('dbMonthSelavu').innerText      = '₹' + currentCycleSelavu;
+            document.getElementById('dbYearSelavu').innerText       = '₹' + currentYearSelavu;
         }
 
         function handleViewModeChange() {
@@ -1602,68 +1536,6 @@
                 document.getElementById('yearlySummaryBody').innerHTML = buildSummaryRows(yearlyItems);
         }
 
-        // ★ Mobile-friendly file download helper
-        function mobileDownload(content, filename, mimeType) {
-            try {
-                // Method 1: Blob URL (works in most browsers)
-                let blob = new Blob([content], { type: mimeType });
-                let url  = URL.createObjectURL(blob);
-                let a    = document.createElement('a');
-                a.href     = url;
-                a.download = filename;
-                a.style.display = 'none';
-                document.body.appendChild(a);
-                a.click();
-                setTimeout(function() {
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                }, 2000);
-                return true;
-            } catch(e) {
-                return false;
-            }
-        }
-
-        // ★ Excel download — base64 method (mobile WebView compatible)
-        function excelDownload(wb, filename) {
-            try {
-                let wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
-                let link  = document.createElement('a');
-                link.href = 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + wbout;
-                link.download = filename;
-                link.style.display = 'none';
-                document.body.appendChild(link);
-                link.click();
-                setTimeout(function() { document.body.removeChild(link); }, 2000);
-                toast('✅ Excel download தொடங்கியது!', 'info');
-            } catch(e) {
-                toast('Download சிக்கல்: ' + e.message, 'error');
-            }
-        }
-
-        // ★ PDF — print window method (mobile compatible)
-        function pdfPrint(htmlContent, title) {
-            try {
-                let win = window.open('', '_blank', 'width=800,height=600');
-                if (!win) {
-                    // Popup blocked — same window-ல் print பண்ணு
-                    let d = document.createElement('div');
-                    d.id = 'printFrame';
-                    d.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:white;z-index:99999;overflow:auto;padding:20px;box-sizing:border-box;';
-                    d.innerHTML = '<button onclick="document.getElementById(\'printFrame\').remove();window.print();" style="background:#007bff;color:white;border:none;padding:10px 20px;border-radius:6px;font-size:14px;cursor:pointer;margin-bottom:15px;">🖨️ Print / Save PDF</button>'
-                        + '<button onclick="document.getElementById(\'printFrame\').remove();" style="background:#6c757d;color:white;border:none;padding:10px 15px;border-radius:6px;font-size:14px;cursor:pointer;margin-bottom:15px;margin-left:10px;">✖ மூடு</button>'
-                        + htmlContent;
-                    document.body.appendChild(d);
-                    return;
-                }
-                win.document.write(htmlContent);
-                win.document.close();
-                setTimeout(function() { win.print(); }, 800);
-            } catch(e) {
-                toast('Print சிக்கல்: ' + e.message, 'error');
-            }
-        }
-
         function exportLoanListToExcel() {
             let listFilter = (document.getElementById('loanListFilter') || {}).value || 'ALL';
             let filterLabel = {'monthly':'Monthly','yearly':'Yearly','pending':'Pending','paid_cycle':'PaidCycle','closed':'Closed'}[listFilter] || listFilter;
@@ -1684,7 +1556,7 @@
             ws['!cols'] = [{wch:12},{wch:20},{wch:10},{wch:12},{wch:12},{wch:12},{wch:12}];
             let wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, filterLabel + ' கடன் பட்டியல்');
-            excelDownload(wb, 'LoanList_' + filterLabel + '_' + new Date().toLocaleDateString('en-GB').replace(/\//g,'.') + '.xlsx');
+            XLSX.writeFile(wb, 'LoanList_' + filterLabel + '_' + new Date().toLocaleDateString('en-GB').replace(/\//g,'.') + '.xlsx');
         }
 
         function exportStatementToExcel() {
@@ -1693,6 +1565,7 @@
             if(!fromDateVal || !toDateVal) { alert('முதலில் தேதி தேர்ந்தெடுத்து "கணக்கைப் பார்" பண்ணுங்க!'); return; }
             let mode = document.getElementById('stmtViewMode').value;
             let wb   = XLSX.utils.book_new();
+
             if(mode === "ALL" || mode === "BANK_ONLY") {
                 let txTable = document.getElementById("bankStatementTable");
                 if(txTable && txTable.rows.length > 1) {
@@ -1702,66 +1575,57 @@
                 }
             }
             if(mode === "ALL" || mode === "LOAN_ONLY") {
-                let mT = document.getElementById("monthlySummaryBody");
-                let yT = document.getElementById("yearlySummaryBody");
-                if(mT) { let ws2 = XLSX.utils.table_to_sheet(mT.closest('table')); XLSX.utils.book_append_sheet(wb, ws2, "Monthly கடன்"); }
-                if(yT) { let ws3 = XLSX.utils.table_to_sheet(yT.closest('table')); XLSX.utils.book_append_sheet(wb, ws3, "Yearly கடன்"); }
+                let loanTable = document.getElementById("loanSummaryTable");
+                if(loanTable && loanTable.rows.length > 1) {
+                    let wsLoan = XLSX.utils.table_to_sheet(loanTable);
+                    wsLoan['!cols'] = [{wch:24},{wch:15},{wch:15},{wch:15},{wch:15}];
+                    XLSX.utils.book_append_sheet(wb, wsLoan, "கடன் இருப்பு நிலவரம்");
+                }
             }
-            if(wb.SheetNames.length === 0) { alert('Download பண்ண data இல்லை!'); return; }
-            excelDownload(wb, 'Kovil_Report_' + fromDateVal + '_to_' + toDateVal + '.xlsx');
-        }
-
-        function getPdfStyle() {
-            return '<style>'
-                + 'body{font-family:Arial,sans-serif;padding:15px;color:#333;font-size:11px;margin:0;}'
-                + 'table{width:100%;border-collapse:collapse;margin-bottom:14px;font-size:10px;}'
-                + 'th,td{border:1px solid #ccc;padding:4px 5px;text-align:left;word-break:break-word;}'
-                + 'th{background:#2c3e50!important;color:white!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}'
-                + 'tr:nth-child(even){background:#f9f9f9;}'
-                + 'h3{font-size:13px;margin:12px 0 5px 0;}'
-                + '.no-print{display:none!important;}'
-                + '@media print{'
-                + '@page{margin:8mm;size:A4 portrait;}'
-                + '.no-print{display:none!important;}'
-                + '}'
-                + '</style>';
+            if(wb.SheetNames.length === 0) { alert('Download பண்ண data இல்லை! முதலில் "கணக்கைப் பார்" பண்ணுங்க.'); return; }
+            XLSX.writeFile(wb, 'Kovil_Report_' + fromDateVal + '_to_' + toDateVal + '.xlsx');
         }
 
         function exportStatementToPDF() {
             let fromDateVal = document.getElementById('stmtFromDate').value;
             let toDateVal   = document.getElementById('stmtToDate').value;
             if(!fromDateVal || !toDateVal) { alert('முதலில் தேதி தேர்ந்தெடுத்து "கணக்கைப் பார்" பண்ணுங்க!'); return; }
-            let mode      = document.getElementById('stmtViewMode').value;
-            let titleText = document.getElementById('stmtMainTitle') ? document.getElementById('stmtMainTitle').innerText : 'கோவில் அறிக்கை';
-            let fromDisp  = fromDateVal.split('-').reverse().join('.');
-            let toDisp    = toDateVal.split('-').reverse().join('.');
+            let mode       = document.getElementById('stmtViewMode').value;
+            let titleText  = document.getElementById('stmtMainTitle') ? document.getElementById('stmtMainTitle').innerText : 'கோவில் அறிக்கை';
+            let periodText = document.getElementById('stmtPeriodText') ? document.getElementById('stmtPeriodText').innerText : '';
 
             let bankHtml = '', loanHtml = '';
             if(mode === "ALL" || mode === "BANK_ONLY") {
                 let t = document.getElementById("bankStatementTable");
-                if(t) bankHtml = '<h3>🟢🔴 வங்கி வரவு - செலவு கணக்கு அறிக்கை</h3>' + t.outerHTML;
+                if(t) bankHtml = '<h3 style="color:#007bff;font-size:14px;margin:16px 0 6px 0;">🟢🔴 வங்கி வரவு - செலவு கணக்கு அறிக்கை</h3>' + t.outerHTML;
             }
             if(mode === "ALL" || mode === "LOAN_ONLY") {
-                let mDiv = document.getElementById("monthlyLoanSummaryDiv");
-                let yDiv = document.getElementById("yearlyLoanSummaryDiv");
-                if(mDiv && mDiv.style.display !== 'none') loanHtml += mDiv.innerHTML;
-                if(yDiv && yDiv.style.display !== 'none') loanHtml += yDiv.innerHTML;
-                if(loanHtml) loanHtml = '<h3>📊 நபர் வாரியான வட்டி கடன் இருப்பு நிலவரம்</h3>' + loanHtml;
+                let t = document.getElementById("loanSummaryTable");
+                if(t) loanHtml = '<h3 style="color:#2c3e50;font-size:14px;margin:24px 0 6px 0;">📊 நபர் வாரியான வட்டி கடன் இருப்பு நிலவரம்</h3>' + t.outerHTML;
             }
-            if(!bankHtml && !loanHtml) { alert('Data இல்லை! முதலில் "கணக்கைப் பார்" பண்ணுங்க.'); return; }
+            if(!bankHtml && !loanHtml) { alert('Download பண்ண data இல்லை! முதலில் "கணக்கைப் பார்" பண்ணுங்க.'); return; }
 
-            let fullHtml = '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + titleText + '</title>'
-                + getPdfStyle()
-                + '</head><body>'
-                + '<div class="no-print" style="display:block!important;margin-bottom:12px;">'
-                + '<button onclick="window.print();" style="background:#007bff;color:white;border:none;padding:10px 20px;border-radius:6px;font-size:14px;cursor:pointer;margin-right:8px;">🖨️ Print / Save PDF</button>'
-                + '<button onclick="window.close();" style="background:#6c757d;color:white;border:none;padding:10px 15px;border-radius:6px;font-size:14px;cursor:pointer;">✖ மூடு</button>'
-                + '</div>'
+            // Build full HTML and open print dialog using blob URL (works in file://)
+            let fromDisp = fromDateVal.split('-').reverse().join('.');
+            let toDisp   = toDateVal.split('-').reverse().join('.');
+            let fullHtml = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>' + titleText + '</title><style>'
+                + 'body{font-family:Arial,sans-serif;padding:20px;color:#333;font-size:12px;}'
+                + 'table{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:11px;}'
+                + 'th,td{border:1px solid #ccc;padding:5px 6px;text-align:left;}'
+                + 'th{background:#2c3e50!important;color:white!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}'
+                + 'tr:nth-child(even){background:#f9f9f9;}'
+                + '@media print{@page{margin:10mm;size:A4 portrait;}}'
+                + '</style></head><body>'
                 + getTempleHeaderHtml(fromDisp, toDisp)
                 + bankHtml + loanHtml
+                + '<script>window.onload=function(){window.print();}<\/script>'
                 + '</body></html>';
 
-            pdfPrint(fullHtml, titleText);
+            let blob = new Blob([fullHtml], {type:'text/html;charset=utf-8'});
+            let url  = URL.createObjectURL(blob);
+            let win  = window.open(url, '_blank');
+            if(!win) { alert('Popup blocked! Browser settings-ல் popup allow பண்ணுங்க.'); }
+            setTimeout(function(){ URL.revokeObjectURL(url); }, 10000);
         }
 
         function exportLoanListToPDF() {
@@ -1770,19 +1634,25 @@
             let t = document.getElementById('mainLoanTable');
             if(!t) { alert('பட்டியல் இல்லை!'); return; }
 
-            let fullHtml = '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>கடன் பட்டியல்</title>'
-                + getPdfStyle()
-                + '</head><body>'
-                + '<div class="no-print" style="display:block!important;margin-bottom:12px;">'
-                + '<button onclick="window.print();" style="background:#007bff;color:white;border:none;padding:10px 20px;border-radius:6px;font-size:14px;cursor:pointer;margin-right:8px;">🖨️ Print / Save PDF</button>'
-                + '<button onclick="window.close();" style="background:#6c757d;color:white;border:none;padding:10px 15px;border-radius:6px;font-size:14px;cursor:pointer;">✖ மூடு</button>'
-                + '</div>'
+            let fullHtml = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>கடன் பட்டியல்</title><style>'
+                + 'body{font-family:Arial,sans-serif;padding:20px;font-size:12px;}'
+                + 'table{width:100%;border-collapse:collapse;}'
+                + 'th,td{border:1px solid #ccc;padding:5px 6px;text-align:left;font-size:11px;}'
+                + 'th{background:#2c3e50!important;color:white!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}'
+                + 'tr:nth-child(even){background:#f9f9f9;}'
+                + '@media print{@page{margin:10mm;size:A4 portrait;}}'
+                + '</style></head><body>'
                 + getTempleHeaderHtml('', '')
-                + '<h3 style="text-align:center;">📋 ' + filterLabel + ' கடன் பட்டியல்</h3>'
+                + '<h3 style="text-align:center;color:#2c3e50;margin:0 0 10px 0;">📋 ' + filterLabel + ' கடன் பட்டியல்</h3>'
                 + t.outerHTML
+                + '<script>window.onload=function(){window.print();}<\/script>'
                 + '</body></html>';
 
-            pdfPrint(fullHtml, 'கடன் பட்டியல்');
+            let blob = new Blob([fullHtml], {type:'text/html;charset=utf-8'});
+            let url  = URL.createObjectURL(blob);
+            let win  = window.open(url, '_blank');
+            if(!win) { alert('Popup blocked! Browser settings-ல் popup allow பண்ணுங்க.'); }
+            setTimeout(function(){ URL.revokeObjectURL(url); }, 10000);
         }
 
         // ================= PAGINATION STATE =================
@@ -2054,29 +1924,25 @@
             if (!isValidDate(bulkDate)) { toast('சரியான தேதி கொடுங்கள் (DD.MM.YYYY)', 'warn'); return; }
             if(!confirm('தேர்ந்தெடுத்த ' + monthlyItems.length + ' Monthly நபர்களுக்கு வட்டியும் அசலும் வசூல் செய்யவா?\nதேதி: ' + bulkDate)) return;
 
-            showLoading(true, monthlyItems.length + ' நபர்களுக்கு வட்டி + அசல் சேமிக்கிறோம்...');
-            try {
-                // Step 1: Loan rows close (BATCH_UPDATE) — முதலில்
-                let loanUpdates = monthlyItems.map(item => ({
-                    id: parseInt(item.id),
-                    sheet1: { vaddiStatus: 'Paid', amount: 0, status: 'Paid' }
-                }));
-                await safePost({ action: 'BATCH_UPDATE', updates: loanUpdates });
+            showLoading(true);
+            // 1) Loan rows close பண்ணு (BATCH_UPDATE)
+            let loanUpdates = monthlyItems.map(item => ({
+                id: parseInt(item.id),
+                sheet1: { vaddiStatus: 'Paid', amount: 0, status: 'Paid' }
+            }));
+            await fetch(scriptUrl, { method: 'POST', body: JSON.stringify({ action: 'BATCH_UPDATE', updates: loanUpdates }) });
 
-                // Step 2: Transaction rows (BATCH_CREATE) — Step 1 முடிஞ்சதும்
-                let batchRows = [];
-                monthlyItems.forEach(item => {
-                    let n    = String(getRowValue(item, ['receiverName'], ''));
-                    let vaddi = parseFloat(getRowValue(item, ['interestAmt'], 0));
-                    let asal  = parseFloat(getRowValue(item, ['amount'], 0));
-                    batchRows.push({ date: bulkDate, receiverName: n, description: 'வட்டி வசூல்', amount: vaddi, accounttype: 'vaddi_vasool', loanType: 'monthly', loanRefId: parseInt(item.id), status: 'N/A', type: 'varavu' });
-                    batchRows.push({ date: bulkDate, receiverName: n, description: 'அசல் திரும்பியது', amount: asal, accounttype: 'asal_return', loanType: 'monthly', loanRefId: parseInt(item.id), status: 'N/A', type: 'varavu' });
-                });
-                await safePost({ action: 'BATCH_CREATE', rows: batchRows });
-                toast(monthlyItems.length + ' நபர்களுக்கு வட்டி + அசல் வசூலானது! ✅');
-            } catch(err) {
-                toast('சேமிப்பதில் சிக்கல்! மீண்டும் முயற்சிக்கவும்.', 'error');
-            }
+            // 2) வட்டி + அசல் transaction rows — ஒரே BATCH_CREATE call
+            let batchRows = [];
+            monthlyItems.forEach(item => {
+                let name  = String(getRowValue(item, ['receiverName'], ''));
+                let vaddi = parseFloat(getRowValue(item, ['interestAmt'], 0));
+                let asal  = parseFloat(getRowValue(item, ['amount'], 0));
+                batchRows.push({ date: bulkDate, receiverName: name, description: 'வட்டி வசூல்', amount: vaddi, accounttype: 'vaddi_vasool', loanType: 'monthly', loanRefId: parseInt(item.id), status: 'N/A', type: 'varavu' });
+                batchRows.push({ date: bulkDate, receiverName: name, description: 'அசல் திரும்பியது', amount: asal, accounttype: 'asal_return', loanType: 'monthly', loanRefId: parseInt(item.id), status: 'N/A', type: 'varavu' });
+            });
+            await fetch(scriptUrl, { method: 'POST', body: JSON.stringify({ action: 'BATCH_CREATE', rows: batchRows }) });
+            toast(monthlyItems.length + ' நபர்களுக்கு வட்டி + அசல் வசூலானது! ✅');
             closeCollectPanel();
             await fetchDocs(true);
             showLoading(false);
@@ -2090,6 +1956,8 @@
             if (!isValidDate(bulkDate)) { toast('சரியான தேதி கொடுங்கள் (DD.MM.YYYY)', 'warn'); return; }
             if(!confirm('தேர்ந்தெடுக்கப்பட்ட ' + selectedCbs.length + ' நபர்களுக்கும் வட்டி வந்துவிட்டதா?\nதேதி: ' + bulkDate)) return;
 
+            showLoading(true);
+            // 1) Loan rows vaddiStatus Paid பண்ணு (BATCH_UPDATE)
             let loanUpdates = [];
             let bulkItems = [];
             selectedCbs.forEach(cb => {
@@ -2097,29 +1965,22 @@
                 let item = allRows.find(r => r.id === rowId);
                 if(item) { loanUpdates.push({ id: rowId, sheet1: { vaddiStatus: 'Paid' } }); bulkItems.push(item); }
             });
+            await fetch(scriptUrl, { method: 'POST', body: JSON.stringify({ action: 'BATCH_UPDATE', updates: loanUpdates }) });
 
-            showLoading(true, bulkItems.length + ' நபர்களுக்கு வட்டி சேமிக்கிறோம்...');
-            try {
-                // Step 1: BATCH_UPDATE
-                await safePost({ action: 'BATCH_UPDATE', updates: loanUpdates });
-
-                // Step 2: BATCH_CREATE — Step 1 முடிஞ்சதும்
-                let batchVaddiRows = bulkItems.map(item => ({
-                    date: bulkDate,
-                    receiverName: String(getRowValue(item, ['receiverName'], '')),
-                    description: 'வட்டி வசூல்',
-                    amount: parseFloat(getRowValue(item, ['interestAmt'], 0)),
-                    accounttype: 'vaddi_vasool',
-                    loanType: String(getRowValue(item, ['loanType'], 'monthly')).toLowerCase().trim(),
-                    loanRefId: parseInt(item.id),
-                    status: 'N/A',
-                    type: 'varavu'
-                }));
-                await safePost({ action: 'BATCH_CREATE', rows: batchVaddiRows });
-                toast(bulkItems.length + ' நபர்களுக்கு வட்டி வரவு வைக்கப்பட்டது! ✅');
-            } catch(err) {
-                toast('சேமிப்பதில் சிக்கல்! மீண்டும் முயற்சிக்கவும்.', 'error');
-            }
+            // 2) வட்டி transaction rows — ஒரே BATCH_CREATE call
+            let batchVaddiRows = bulkItems.map(item => ({
+                date: bulkDate,
+                receiverName: String(getRowValue(item, ['receiverName'], '')),
+                description: 'வட்டி வசூல்',
+                amount: parseFloat(getRowValue(item, ['interestAmt'], 0)),
+                accounttype: 'vaddi_vasool',
+                loanType: String(getRowValue(item, ['loanType'], 'monthly')).toLowerCase().trim(),
+                loanRefId: parseInt(item.id),
+                status: 'N/A',
+                type: 'varavu'
+            }));
+            await fetch(scriptUrl, { method: 'POST', body: JSON.stringify({ action: 'BATCH_CREATE', rows: batchVaddiRows }) });
+            toast(bulkItems.length + ' நபர்களுக்கு வட்டி வரவு வைக்கப்பட்டது! ✅');
             closeCollectPanel();
             await fetchDocs(true);
             showLoading(false);
@@ -2290,19 +2151,16 @@
 
             if (!confirm(name + '\nவட்டி: ₹' + vaddi.toLocaleString('en-IN') + '\nஅசல்: ₹' + currentAsal.toLocaleString('en-IN') + '\nமொத்தம்: ₹' + (vaddi + currentAsal).toLocaleString('en-IN') + '\nதேதி: ' + collectDate + '\n\n⚠️ அசல் முழுசா திரும்பியது — கணக்கு Closed ஆகும்!\n\nசரியா?')) return;
 
-            showLoading(true, name + ' — வட்டி + அசல் சேமிக்கிறோம்...');
-            try {
-                // Step 1: Loan row close பண்ணு
-                await safePost({ action: 'UPDATE', id: parseInt(selectedRowId), sheet1: { vaddiStatus: 'Paid', amount: 0, status: 'Paid' } });
-                // Step 2: Transaction rows create (கட்டாயம் Step 1 முடிஞ்சதும் மட்டும்)
-                await safePost({ action: 'BATCH_CREATE', rows: [
+            showLoading(true);
+            // Loan close + BATCH_CREATE (வட்டி+அசல்) — parallel
+            await Promise.all([
+                fetch(scriptUrl, { method: 'POST', body: JSON.stringify({ action: 'UPDATE', id: parseInt(selectedRowId), sheet1: { vaddiStatus: 'Paid', amount: 0, status: 'Paid' } }) }),
+                fetch(scriptUrl, { method: 'POST', body: JSON.stringify({ action: 'BATCH_CREATE', rows: [
                     { date: collectDate, receiverName: name, description: 'வட்டி வசூல்', amount: vaddi, accounttype: 'vaddi_vasool', loanType: 'monthly', loanRefId: parseInt(selectedRowId), status: 'N/A', type: 'varavu' },
                     { date: collectDate, receiverName: name, description: 'அசல் திரும்பியது', amount: currentAsal, accounttype: 'asal_return', loanType: 'monthly', loanRefId: parseInt(selectedRowId), status: 'N/A', type: 'varavu' }
-                ]});
-                toast(name + ' — வட்டி + அசல் வசூலானது! கணக்கு Closed ✅ (' + collectDate + ')');
-            } catch(err) {
-                toast('சேமிப்பதில் சிக்கல்! மீண்டும் முயற்சிக்கவும்.', 'error');
-            }
+                ]}) })
+            ]);
+            toast(name + ' — வட்டி + அசல் வசூலானது! கணக்கு Closed ✅ (' + collectDate + ')');
             closeCollectPanel();
             await fetchDocs(true);
             showLoading(false);
@@ -2318,16 +2176,13 @@
             let collectDate = getCollectDate('collectDate');
             if (!isValidDate(collectDate)) { toast('சரியான தேதி கொடுங்கள் (DD.MM.YYYY)', 'warn'); return; }
 
-            showLoading(true, name + ' — வட்டி சேமிக்கிறோம்...');
-            try {
-                // Step 1: vaddiStatus Paid
-                await safePost({ action: 'UPDATE', id: parseInt(selectedRowId), sheet1: { vaddiStatus: 'Paid' } });
-                // Step 2: transaction row
-                await safePost({ action: 'CREATE', sheet1: { date: collectDate, receiverName: name, description: 'வட்டி வசூல்', amount: setting, accounttype: 'vaddi_vasool', loanType: loanType, loanRefId: parseInt(selectedRowId), status: 'N/A', type: 'varavu' } });
-                toast(name + ' — வட்டி வசூலானது! ✅ (' + collectDate + ')');
-            } catch(err) {
-                toast('சேமிப்பதில் சிக்கல்! மீண்டும் முயற்சிக்கவும்.', 'error');
-            }
+            showLoading(true);
+            // Loan update + CREATE — parallel
+            await Promise.all([
+                fetch(scriptUrl, { method: 'POST', body: JSON.stringify({ action: 'UPDATE', id: parseInt(selectedRowId), sheet1: { vaddiStatus: 'Paid' } }) }),
+                fetch(scriptUrl, { method: 'POST', body: JSON.stringify({ action: 'CREATE', sheet1: { date: collectDate, receiverName: name, description: 'வட்டி வசூல்', amount: setting, accounttype: 'vaddi_vasool', loanType: loanType, loanRefId: parseInt(selectedRowId), status: 'N/A', type: 'varavu' } }) })
+            ]);
+            toast(name + ' — வட்டி வசூலானது! ✅ (' + collectDate + ')');
             closeCollectPanel();
             await fetchDocs(true);
             showLoading(false);
@@ -2349,22 +2204,18 @@
             let name = String(getRowValue(item, ['receiverName'], ''));
             let loanType = String(getRowValue(item, ['loanType'], 'monthly')).toLowerCase().trim();
 
+            // Loan update + CREATE — parallel
             let loanUpd = { amount: isFullyPaid ? 0 : remaining };
             if (isFullyPaid) { loanUpd.status = 'Paid'; loanUpd.vaddiStatus = 'Paid'; }
+            await Promise.all([
+                fetch(scriptUrl, { method: 'POST', body: JSON.stringify({ action: 'UPDATE', id: parseInt(selectedRowId), sheet1: loanUpd }) }),
+                fetch(scriptUrl, { method: 'POST', body: JSON.stringify({ action: 'CREATE', sheet1: { date: collectDate, receiverName: name, description: 'அசல் திரும்பியது', amount: paid, accounttype: 'asal_return', loanType: loanType, loanRefId: parseInt(selectedRowId), status: 'N/A', type: 'varavu' } }) })
+            ]);
 
-            showLoading(true, name + ' — அசல் சேமிக்கிறோம்...');
-            try {
-                // Step 1: loan row update
-                await safePost({ action: 'UPDATE', id: parseInt(selectedRowId), sheet1: loanUpd });
-                // Step 2: transaction row
-                await safePost({ action: 'CREATE', sheet1: { date: collectDate, receiverName: name, description: 'அசல் திரும்பியது', amount: paid, accounttype: 'asal_return', loanType: loanType, loanRefId: parseInt(selectedRowId), status: 'N/A', type: 'varavu' } });
-                if (isFullyPaid) {
-                    toast(name + ' — அசல் முழுசா திரும்பியது! கணக்கு Closed ✅ (' + collectDate + ')');
-                } else {
-                    toast(name + ' — அசல் ₹' + paid.toLocaleString('en-IN') + ' திரும்பியது! நிலுவை: ₹' + remaining.toLocaleString('en-IN') + ' (' + collectDate + ')');
-                }
-            } catch(err) {
-                toast('சேமிப்பதில் சிக்கல்! மீண்டும் முயற்சிக்கவும்.', 'error');
+            if (isFullyPaid) {
+                toast(name + ' — அசல் முழுசா திரும்பியது! கணக்கு Closed ✅ (' + collectDate + ')');
+            } else {
+                toast(name + ' — அசல் ₹' + paid.toLocaleString('en-IN') + ' திரும்பியது! நிலுவை: ₹' + remaining.toLocaleString('en-IN') + ' (' + collectDate + ')');
             }
             closeCollectPanel();
             await fetchDocs(true);
@@ -2378,15 +2229,13 @@
             let asal = parseFloat(getRowValue(item, ['amount'], 0));
             if(!confirm(`${name} — அசல் ₹${asal} திரும்பியது உறுதியா?\n\nYearly Loan Close பண்ணவா?`)) return;
 
-            showLoading(true, name + ' — Yearly Loan Close பண்றோம்...');
+            showLoading(true);
             let collectDate = getCollectDate('collectDate');
-            try {
-                await safePost({ action: 'UPDATE', id: parseInt(selectedRowId), sheet1: { status: 'Paid', amount: 0, vaddiStatus: 'Paid' } });
-                await safePost({ action: 'CREATE', sheet1: { date: collectDate, receiverName: name, description: 'அசல் திரும்பியது — Yearly Close', amount: asal, accounttype: 'asal_return', loanType: 'yearly', loanRefId: parseInt(selectedRowId), status: 'N/A', type: 'varavu' } });
-                toast(`${name} — Yearly Loan வெற்றிகரமாக Close ஆனது! ✅`);
-            } catch(err) {
-                toast('சேமிப்பதில் சிக்கல்! மீண்டும் முயற்சிக்கவும்.', 'error');
-            }
+            await Promise.all([
+                fetch(scriptUrl, { method: 'POST', body: JSON.stringify({ action: 'UPDATE', id: parseInt(selectedRowId), sheet1: { status: 'Paid', amount: 0, vaddiStatus: 'Paid' } }) }),
+                fetch(scriptUrl, { method: 'POST', body: JSON.stringify({ action: 'CREATE', sheet1: { date: collectDate, receiverName: name, description: 'அசல் திரும்பியது — Yearly Close', amount: asal, accounttype: 'asal_return', loanType: 'yearly', loanRefId: parseInt(selectedRowId), status: 'N/A', type: 'varavu' } }) })
+            ]);
+            toast(`${name} — Yearly Loan வெற்றிகரமாக Close ஆனது! ✅`);
             closeCollectPanel();
             await fetchDocs(true);
             showLoading(false);
@@ -2416,13 +2265,11 @@
             safeSetLocal('cycleVaddiBase',  String(totalVattiAllTime));
             safeSetLocal('cycleVaravuBase', String(totalVaravuAllTime));
             safeSetLocal('cycleSelavuBase', String(totalSelavuAllTime));
-            // ★ Save cycle reset date (DD.MM.YYYY) — dashboard date-based filter-க்கு
-            safeSetLocal('cycleResetDate', getActiveDate());
 
             // Reset all active loan vaddiStatus to Pending - single batch call
             if(activeLoans.length > 0) {
                 let updates = activeLoans.map(item => ({ id: parseInt(item.id), sheet1: { vaddiStatus: 'Pending' } }));
-                await safePost({ action: 'BATCH_UPDATE', updates: updates });
+                await fetch(scriptUrl, { method: 'POST', body: JSON.stringify({ action: 'BATCH_UPDATE', updates: updates }) });
             }
 
             showLoading(false);
@@ -2451,7 +2298,6 @@
             safeSetLocal('cycleVaddiBase',   String(totalVattiAllTime));
             safeSetLocal('cycleVaravuBase',  String(totalVaravuAllTime));
             safeSetLocal('cycleSelavuBase',  String(totalSelavuAllTime));
-            safeSetLocal('cycleResetDate',   getActiveDate());
 
             // Refresh myCapital from storage before recalculating
             myCapital = parseFloat(safeGetLocal('myCapital', '0') || 0);
