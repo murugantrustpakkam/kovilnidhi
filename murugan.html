@@ -1571,34 +1571,36 @@
                 }
             });
 
-            // Date ascending sort (balance calculation-க்கு)
+            // Date ascending sort (balance calculation-க்கு — பழையது முதல்)
             expandedEntries.sort((a, b) => a.jsDate - b.jsDate);
 
-            // ★ FIXED: Opening balance மேலே, பழைய → புதிய (chronological order)
-            // Balance forward-ஆக calculate → ஒவ்வொரு row-லயும் correct running balance
+            // Step 1: பழையது முதல் balance calculate பண்ணு
             stmtRowCounter = 0;
-            let builtRows = [];
             let currentBal = runningBalance;
 
-            // Opening balance row — எப்போதும் முதல் row
-            // ★ runningBalance = openingCapital + pre-range transactions (correct opening for the period)
-            // openingCapital = raw capital amount மட்டும் (info-க்காக காட்டு)
+            let filteredEntries = expandedEntries.filter(entry => {
+                if (bankFilter === 'LOAN'   && entry.type !== 'loan_given' && entry.type !== 'vaddi' && entry.type !== 'asal') return false;
+                if (bankFilter === 'VARAVU' && entry.type !== 'varavu') return false;
+                if (bankFilter === 'SELAVU' && entry.type !== 'selavu') return false;
+                return true;
+            });
+
+            let renderedRows = filteredEntries.map(entry => {
+                let result = entry.render(currentBal);
+                currentBal = result.bal;
+                return result.html;
+            });
+
+            // Step 2: Opening balance row (கடைசியில் / கீழே காட்ட)
             let openingRow = mkRow('#f0f4ff',
                 fromDateVal.split('-').reverse().join('.'),
                 'தொடக்க இருப்பு (Opening Balance)',
                 'ஆரம்ப முதலீடு: ₹' + openingCapital.toLocaleString('en-IN') + (capitalDate !== '—' ? ' (தேதி: ' + capitalDate + ')' : ''),
-                0, 0, 0, 0, currentBal);
-            builtRows.push(openingRow);
+                0, 0, 0, 0, runningBalance);
 
-            // பழைய தேதி → புதிய தேதி (oldest first, newest last)
-            expandedEntries.forEach(entry => {
-                if (bankFilter === 'LOAN'   && entry.type !== 'loan_given' && entry.type !== 'vaddi' && entry.type !== 'asal') return;
-                if (bankFilter === 'VARAVU' && entry.type !== 'varavu') return;
-                if (bankFilter === 'SELAVU' && entry.type !== 'selavu') return;
-                let result = entry.render(currentBal);
-                currentBal = result.bal;
-                builtRows.push(result.html);
-            });
+            // புதிய தேதி மேலே → பழைய தேதி கீழே → Opening balance கடைசி
+            let builtRows = [...renderedRows].reverse();
+            builtRows.push(openingRow);
 
             document.getElementById('bankStatementBody').innerHTML = builtRows.join('') || '<tr><td colspan="8" style="text-align:center;">தரவுகள் எதுவும் இல்லை</td></tr>';
 
