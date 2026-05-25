@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>கோவில் நிதி மேலாண்மை செயலி</title>
+    <title>கோவில் நிதி மேலாண்மை செயலி v12</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
@@ -1563,11 +1563,21 @@
             // Date ascending sort (balance calculation-க்கு)
             expandedEntries.sort((a, b) => a.jsDate - b.jsDate);
 
-            // Balance calculate பண்ணி rows build பண்ணு
-            stmtRowCounter = 0; // serial number reset
+            // ★ FIXED: Opening balance மேலே, பழைய → புதிய (chronological order)
+            // Balance forward-ஆக calculate → ஒவ்வொரு row-லயும் correct running balance
+            stmtRowCounter = 0;
             let builtRows = [];
             let currentBal = runningBalance;
 
+            // Opening balance row — எப்போதும் முதல் row
+            let openingRow = mkRow('#f0f4ff',
+                fromDateVal.split('-').reverse().join('.'),
+                'தொடக்க இருப்பு (Opening Balance)',
+                'முதலீட்டு தேதி: ' + capitalDate + ' | ஆரம்ப முதலீடு: ₹' + openingCapital.toLocaleString('en-IN'),
+                0, 0, 0, 0, currentBal);
+            builtRows.push(openingRow);
+
+            // பழைய தேதி → புதிய தேதி (oldest first, newest last)
             expandedEntries.forEach(entry => {
                 if (bankFilter === 'LOAN'   && entry.type !== 'loan_given' && entry.type !== 'vaddi' && entry.type !== 'asal') return;
                 if (bankFilter === 'VARAVU' && entry.type !== 'varavu') return;
@@ -1576,17 +1586,6 @@
                 currentBal = result.bal;
                 builtRows.push(result.html);
             });
-
-            // Opening balance row — கடைசியில் (reverse ஆனா மேலே வரும்)
-            let openingRow = mkRow('#f8f9fa',
-                fromDateVal.split('-').reverse().join('.'),
-                'தொடக்க இருப்பு (Opening Balance)',
-                'முதலீட்டு தேதி: ' + capitalDate + ' | ஆரம்ப முதலீடு: ₹' + openingCapital.toLocaleString('en-IN'),
-                0, 0, 0, 0, openingCapital);
-
-            // Reverse: புதியது மேலே, opening balance கீழே
-            builtRows.reverse();
-            builtRows.push(openingRow);
 
             document.getElementById('bankStatementBody').innerHTML = builtRows.join('') || '<tr><td colspan="8" style="text-align:center;">தரவுகள் எதுவும் இல்லை</td></tr>';
 
@@ -1771,27 +1770,48 @@
             }
         }
 
-        // ★ PDF — print window method (mobile compatible)
+        // ★ PDF — data URL method (mobile + popup-blocker compatible)
         function pdfPrint(htmlContent, title) {
             try {
-                let win = window.open('', '_blank', 'width=800,height=600');
-                if (!win) {
-                    // Popup blocked — same window-ல் print பண்ணு
-                    let d = document.createElement('div');
-                    d.id = 'printFrame';
-                    d.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:white;z-index:99999;overflow:auto;padding:20px;box-sizing:border-box;';
-                    d.innerHTML = '<button onclick="document.getElementById(\'printFrame\').remove();window.print();" style="background:#007bff;color:white;border:none;padding:10px 20px;border-radius:6px;font-size:14px;cursor:pointer;margin-bottom:15px;">🖨️ Print / Save PDF</button>'
-                        + '<button onclick="document.getElementById(\'printFrame\').remove();" style="background:#6c757d;color:white;border:none;padding:10px 15px;border-radius:6px;font-size:14px;cursor:pointer;margin-bottom:15px;margin-left:10px;">✖ மூடு</button>'
-                        + htmlContent;
-                    document.body.appendChild(d);
+                // Method 1: data: URL — popup blockers-ஐ bypass பண்ணும், mobile-லயும் works
+                let encoded = 'data:text/html;charset=utf-8,' + encodeURIComponent(htmlContent);
+                let win = window.open(encoded, '_blank');
+                if (win) {
+                    // Give browser time to render before print dialog
+                    setTimeout(function() {
+                        try { win.print(); } catch(e) {}
+                    }, 1200);
                     return;
                 }
-                win.document.write(htmlContent);
-                win.document.close();
-                setTimeout(function() { win.print(); }, 800);
-            } catch(e) {
-                toast('Print சிக்கல்: ' + e.message, 'error');
-            }
+            } catch(e) {}
+
+            // Method 2: Blob URL fallback
+            try {
+                let blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+                let url = URL.createObjectURL(blob);
+                let win2 = window.open(url, '_blank');
+                if (win2) {
+                    setTimeout(function() {
+                        try { win2.print(); } catch(e) {}
+                        setTimeout(function() { URL.revokeObjectURL(url); }, 3000);
+                    }, 1200);
+                    return;
+                }
+                URL.revokeObjectURL(url);
+            } catch(e) {}
+
+            // Method 3: Same-page overlay fallback (popup completely blocked)
+            let existing = document.getElementById('printFrame');
+            if (existing) existing.remove();
+            let d = document.createElement('div');
+            d.id = 'printFrame';
+            d.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:white;z-index:99999;overflow:auto;padding:20px;box-sizing:border-box;';
+            d.innerHTML = '<div style="margin-bottom:15px;">'
+                + '<button onclick="window.print();" style="background:#007bff;color:white;border:none;padding:10px 20px;border-radius:6px;font-size:14px;cursor:pointer;margin-right:8px;">🖨️ Print / Save PDF</button>'
+                + '<button onclick="document.getElementById(\'printFrame\').remove();" style="background:#6c757d;color:white;border:none;padding:10px 15px;border-radius:6px;font-size:14px;cursor:pointer;">✖ மூடு</button>'
+                + '</div>'
+                + htmlContent;
+            document.body.appendChild(d);
         }
 
         function exportLoanListToExcel() {
@@ -2273,9 +2293,11 @@
             let date = document.getElementById('loanDate').value || getActiveDate();
             let loanType = document.querySelector('input[name="loanType"]:checked')?.value || 'monthly';
 
-            if(!name || !amt) { alert('பெயர் மற்றும் தொகை கட்டாயம்!'); return; }
+            if(!name || !amt) { toast('பெயர் மற்றும் தொகை கட்டாயம்!', 'warn'); return; }
+            if(date && !isValidDate(date)) { toast('சரியான தேதி கொடுங்கள் (DD.MM.YYYY)', 'warn'); return; }
+            if(!date) date = getActiveDate();
 
-            showLoading(true);
+            showLoading(true, 'கடன் கணக்கு சேமிக்கிறோம்...');
 
             if(!id) {
                 let existingLoan = allRows.find(r => {
@@ -2299,9 +2321,15 @@
                             date: date,
                             vaddiStatus: 'Pending'
                         };
-                        let bodyData = { action: "UPDATE", id: parseInt(existingLoan.id), sheet1: newCombinedPayload };
-                        await fetch(scriptUrl, { method: 'POST', body: JSON.stringify(bodyData) });
-                        cancelLoanEdit(); fetchDocs(); alert(`${typeLabel} கணக்குடன் வெற்றிகரமாகக் கூட்டப்பட்டது!`);
+                        try {
+                            await safePost({ action: "UPDATE", id: parseInt(existingLoan.id), sheet1: newCombinedPayload });
+                            cancelLoanEdit();
+                            toast(`${typeLabel} கணக்குடன் வெற்றிகரமாகக் கூட்டப்பட்டது! ✅`);
+                        } catch(err) {
+                            toast('சேமிப்பதில் சிக்கல்! மீண்டும் முயற்சிக்கவும்.', 'error');
+                        }
+                        await fetchDocs(true);
+                        showLoading(false);
                         return;
                     }
                 }
@@ -2317,8 +2345,15 @@
                 bodyData = { action: "UPDATE", id: parseInt(id), sheet1: rowPayload };
             }
 
-            await fetch(scriptUrl, { method: 'POST', body: JSON.stringify(bodyData) });
-            cancelLoanEdit(); fetchDocs(); alert('கடன் வெற்றிகரமாக சேமிக்கப்பட்டது!');
+            try {
+                await safePost(bodyData);
+                cancelLoanEdit();
+                toast('கடன் வெற்றிகரமாக சேமிக்கப்பட்டது! ✅');
+            } catch(err) {
+                toast('சேமிப்பதில் சிக்கல்! மீண்டும் முயற்சிக்கவும்.', 'error');
+            }
+            await fetchDocs(true);
+            showLoading(false);
         }
 
         function populateLoanEdit(id) {
@@ -2473,7 +2508,6 @@
             let collectDate = getCollectDate('collectDate');
             if (!isValidDate(collectDate)) { toast('சரியான தேதி கொடுங்கள் (DD.MM.YYYY)', 'warn'); return; }
 
-            showLoading(true);
             let remaining = currentAsal - paid;
             let isFullyPaid = remaining <= 0;
             let name = String(getRowValue(item, ['receiverName'], ''));
@@ -2634,14 +2668,22 @@
             let amt = parseFloat(document.getElementById('cbAmount').value); 
             let date = document.getElementById('cbDate').value || getActiveDate();
 
-            if(!name || isNaN(amt) || amt <= 0) { alert('விபரம் மற்றும் தொகை கட்டாயம்!'); return; }
+            if(!name || isNaN(amt) || amt <= 0) { toast('விபரம் மற்றும் தொகை கட்டாயம்!', 'warn'); return; }
+            if(date && !isValidDate(date)) { toast('சரியான தேதி கொடுங்கள் (DD.MM.YYYY)', 'warn'); return; }
 
-            showLoading(true);
-            let rowPayload = { date: date, receiverName: name, description: desc, amount: amt, accounttype: type.toLowerCase(), type: type === 'NANKODAI' ? 'varavu_idhar' : 'selavu', status: 'N/A' };
+            showLoading(true, 'பதிவு சேமிக்கிறோம்...');
+            let rowPayload = { date: date || getActiveDate(), receiverName: name, description: desc, amount: amt, accounttype: type.toLowerCase(), type: type === 'NANKODAI' ? 'varavu_idhar' : 'selavu', status: 'N/A' };
             let bodyData = (!id) ? { action: "CREATE", sheet1: rowPayload } : { action: "UPDATE", id: parseInt(id), sheet1: rowPayload };
 
-            await fetch(scriptUrl, { method: 'POST', body: JSON.stringify(bodyData) });
-            cancelCashbookEdit(); fetchDocs(); alert('பதிவு சேமிக்கப்பட்டது!');
+            try {
+                await safePost(bodyData);
+                cancelCashbookEdit();
+                toast(!id ? 'பதிவு சேமிக்கப்பட்டது! ✅' : 'மாற்றங்கள் சேமிக்கப்பட்டது! ✅');
+            } catch(err) {
+                toast('சேமிப்பதில் சிக்கல்! மீண்டும் முயற்சிக்கவும்.', 'error');
+            }
+            await fetchDocs(true);
+            showLoading(false);
         }
 
         function populateCashbookEdit(id) {
@@ -2673,10 +2715,15 @@
 
         async function deleteEntry(id) {
             if(!confirm('நிச்சயமாக அழிக்க வேண்டுமா?')) return;
-            showLoading(true);
-            let bodyData = { action: "DELETE", id: parseInt(id) };
-            await fetch(scriptUrl, { method: 'POST', body: JSON.stringify(bodyData) });
-            fetchDocs(); alert('பதிவு அழிக்கப்பட்டது!');
+            showLoading(true, 'அழிக்கிறோம்...');
+            try {
+                await safePost({ action: "DELETE", id: parseInt(id) });
+                toast('பதிவு அழிக்கப்பட்டது!');
+            } catch(err) {
+                toast('அழிப்பதில் சிக்கல்! மீண்டும் முயற்சிக்கவும்.', 'error');
+            }
+            await fetchDocs(true);
+            showLoading(false);
         }
 
         document.addEventListener('DOMContentLoaded', function() {
@@ -2695,6 +2742,23 @@
             applyAutoDate('loanDate');
             applyAutoDate('cbDate');
             fetchDocs();
+
+            // ★ Auto-refresh: 3 நிமிடத்துக்கு ஒரு முறை — sheet-ல் யாராவது மாற்றினாலும் எல்லாருக்கும் தெரியும்
+            setInterval(function() {
+                lastFetchTime = 0; // cache invalidate
+                fetchDocs(true);
+            }, 3 * 60 * 1000);
+
+            // ★ Page visibility: tab/browser திரும்பி பார்க்கும்போது fresh data fetch
+            document.addEventListener('visibilitychange', function() {
+                if (document.visibilityState === 'visible') {
+                    let timeSinceFetch = Date.now() - lastFetchTime;
+                    if (timeSinceFetch > 60 * 1000) { // 1 நிமிடம் ஆனா refresh
+                        lastFetchTime = 0;
+                        fetchDocs(true);
+                    }
+                }
+            });
         });
     </script>
 </body>
