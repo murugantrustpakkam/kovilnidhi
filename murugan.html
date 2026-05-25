@@ -1357,7 +1357,12 @@
             let sortedRows = [...allRows].map(row => {
                 let rowDate = parseRowDate(row.date);
                 return { ...row, jsDate: rowDate };
-            }).filter(row => !isNaN(row.jsDate)).sort((a, b) => a.jsDate - b.jsDate);
+            }).filter(row => {
+                // ★ app_settings rows (capital, bank_balance, temple_details) statement-ல் வரக்கூடாது
+                let at = String(row.accounttype || '').toLowerCase().trim();
+                if (at === 'app_settings') return false;
+                return !isNaN(row.jsDate);
+            }).sort((a, b) => a.jsDate - b.jsDate);
 
             let openingCapital = parseFloat(safeGetLocal('myCapital', '0') || 0);
             let capitalDate = safeGetLocal('myCapitalDate', '') || '—';
@@ -1366,6 +1371,7 @@
 
             let preRows = sortedRows.filter(row => {
                 let actType = String(row.accounttype || '').toLowerCase().trim();
+                if (actType === 'app_settings') return false; // ★ settings rows விலக்கு
                 let isLoan = actType === 'kadan' || actType === 'loan_given' || actType === 'varavu';
                 if (isLoan) return false;
                 return row.jsDate < fromDate;
@@ -1509,6 +1515,8 @@
 
             let nonLoanInRange = inRangeRows.filter(row => {
                 let actType = String(row.accounttype || '').toLowerCase().trim();
+                // ★ app_settings rows விலக்கு (capital, bank_balance, temple_details)
+                if (actType === 'app_settings') return false;
                 return !(actType === 'kadan' || actType === 'loan_given' || actType === 'varavu');
             });
 
@@ -1570,10 +1578,12 @@
             let currentBal = runningBalance;
 
             // Opening balance row — எப்போதும் முதல் row
+            // ★ runningBalance = openingCapital + pre-range transactions (correct opening for the period)
+            // openingCapital = raw capital amount மட்டும் (info-க்காக காட்டு)
             let openingRow = mkRow('#f0f4ff',
                 fromDateVal.split('-').reverse().join('.'),
                 'தொடக்க இருப்பு (Opening Balance)',
-                'முதலீட்டு தேதி: ' + capitalDate + ' | ஆரம்ப முதலீடு: ₹' + openingCapital.toLocaleString('en-IN'),
+                'ஆரம்ப முதலீடு: ₹' + openingCapital.toLocaleString('en-IN') + (capitalDate !== '—' ? ' (தேதி: ' + capitalDate + ')' : ''),
                 0, 0, 0, 0, currentBal);
             builtRows.push(openingRow);
 
@@ -2727,7 +2737,13 @@
         }
 
         document.addEventListener('DOMContentLoaded', function() {
+            // ★ myCapital = 0 by default — fetchDocs()-ல் Sheet-இல் இருந்து load ஆகும்
+            // வேற system-ல் திறந்தால் localStorage இல்லை — அதனால் Sheet load முடியும் வரை
+            // dashboard-ல் ₹0 காட்டும், பிறகு correct value வரும்.
+            // localStorage இருந்தால் fast initial render மட்டும் — final value Sheet-இல் இருந்தே வரும்
             myCapital = parseFloat(safeGetLocal('myCapital', '0') || 0);
+
+            // Settings page inputs pre-fill (localStorage cache — fast UX)
             let capInput = document.getElementById('inputCapital');
             if (capInput && myCapital > 0) capInput.value = myCapital;
             let capDateInput = document.getElementById('inputCapitalDate');
@@ -2741,6 +2757,8 @@
             loadTempleDetailsUI();
             applyAutoDate('loanDate');
             applyAutoDate('cbDate');
+            // ★ fetchDocs() → Sheet-இல் இருந்து capital load → myCapital update → calculateDashboard()
+            // இதுவே எல்லா systems-க்கும் correct value தரும்
             fetchDocs();
 
             // ★ Auto-refresh: 3 நிமிடத்துக்கு ஒரு முறை — sheet-ல் யாராவது மாற்றினாலும் எல்லாருக்கும் தெரியும்
