@@ -970,7 +970,7 @@
             document.getElementById(`btnPage${pageNum}`).classList.add('active');
             
             // allRows already in memory — re-render only, no fetch
-            if(pageNum === 1) { calculateDashboard(allRows); }
+            if(pageNum === 1) { calculateDashboard(allRows.filter(r => String(r.accounttype||'').toLowerCase().trim() !== 'app_settings')); }
             if(pageNum === 2) { renderLoanData(); applyAutoDate('loanDate'); }
             if(pageNum === 3) { renderCashbookData(); applyAutoDate('cbDate'); }
             if(pageNum === 4) { updateDateSettingUI(); loadTempleDetailsUI(); }
@@ -1134,9 +1134,9 @@
             let yearlyVaravuBase = parseFloat(safeGetLocal('yearlyVaravuBase', '0') || 0);
             let yearlySelavuBase = parseFloat(safeGetLocal('yearlySelavuBase', '0') || 0);
 
-            // ★ 25-நாள் சுழற்சி reset தேதி — இந்த தேதிக்கு பிறகு உள்ள vaddi_vasool மட்டும் count
+            // ★ 25-நாள் சுழற்சி — base subtract approach (most reliable)
+            let cycleVaddiBase    = parseFloat(safeGetLocal('cycleVaddiBase', '0') || 0);
             let cycleResetDateStr = safeGetLocal('cycleResetDate', '');
-            let cycleResetDate = cycleResetDateStr ? parseRowDate(cycleResetDateStr) : null;
 
             // ★ Current calendar month (active date or today)
             let activeDateStr = getActiveDate(); // DD.MM.YYYY
@@ -1145,18 +1145,17 @@
             let curYear  = (!isNaN(activeParsed) && activeParsed instanceof Date) ? activeParsed.getFullYear() : new Date().getFullYear();
 
             let totalVattiEarnedAllTime = 0;
-            let totalVaravuAllTime      = 0;   // நன்கொடை மட்டும்
-            let totalAsalReturnAllTime  = 0;   // அசல் திரும்பியது
+            let totalVaravuAllTime      = 0;
+            let totalAsalReturnAllTime  = 0;
             let totalSelavuAllTime      = 0;
             let currentLoansActiveOutstanding = 0;
 
-            // ★ Date-based counters for 3 dashboard cards
-            let cycleVaddi  = 0;   // 25-நாள் சுழற்சி reset-க்கு பிறகு வட்டி வசூல்
+            // Counters
             let cycleVaddiMonthly = 0, cycleVaddiYearly = 0;
-            let monthVaravu = 0;   // இந்த calendar month நன்கொடை
-            let monthSelavu = 0;   // இந்த calendar month செலவுகள்
-            let givenMonthly = 0, givenYearly = 0; // கடன் breakdown
-            let yearVaddiMonthly = 0, yearVaddiYearly = 0; // yearly vaddi breakdown
+            let monthVaravu = 0;
+            let monthSelavu = 0;
+            let givenMonthly = 0, givenYearly = 0;
+            let yearVaddiMonthly = 0, yearVaddiYearly = 0;
 
             rows.forEach(row => {
                 let amt     = parseFloat(getRowValue(row, ['amount'],      0));
@@ -1175,32 +1174,29 @@
                 } else if (actType === 'vaddi_vasool') {
                     totalVattiEarnedAllTime += amt;
                     let lt = String(getRowValue(row, ['loanType'], 'monthly')).toLowerCase().trim();
-                    // yearly vaddi breakdown
-                    let yBase = lt === 'yearly' ? yearlyVaddiBase : 0;
-                    if (lt === 'yearly') yearVaddiYearly += amt;
-                    else yearVaddiMonthly += amt;
-                    // cycleResetDate-க்கு பிறகு count
-                    if (!cycleResetDate || !isNaN(cycleResetDate) && rdValid && rowDate >= cycleResetDate) {
-                        cycleVaddi += amt;
-                        if (lt === 'yearly') cycleVaddiYearly += amt;
-                        else cycleVaddiMonthly += amt;
-                    }
+                    if (lt === 'yearly') { yearVaddiYearly += amt; cycleVaddiYearly += amt; }
+                    else { yearVaddiMonthly += amt; cycleVaddiMonthly += amt; }
                 } else if (actType === 'asal_return') {
                     totalAsalReturnAllTime += amt;
                 } else if (actType === 'nankodai' || actType === 'varavu_idhar' || actType === 'varavu idhar') {
                     totalVaravuAllTime += amt;
-                    // ★ இந்த calendar month மட்டும்
                     if (rdValid && rowDate.getMonth() === curMonth && rowDate.getFullYear() === curYear) {
                         monthVaravu += amt;
                     }
                 } else if (actType === 'sela_porul' || actType === 'selavu') {
                     totalSelavuAllTime += amt;
-                    // ★ இந்த calendar month மட்டும்
                     if (rdValid && rowDate.getMonth() === curMonth && rowDate.getFullYear() === curYear) {
                         monthSelavu += amt;
                     }
                 }
             });
+
+            // ★ 25-நாள் சுழற்சி வட்டி = மொத்த வட்டி - reset நேரத்தில் இருந்த base
+            let cycleVaddi = Math.max(0, totalVattiEarnedAllTime - cycleVaddiBase);
+            // Monthly/Yearly proportional split
+            let _cycleRawTotal = cycleVaddiMonthly + cycleVaddiYearly;
+            let cycleMonthlyNet = _cycleRawTotal > 0 ? Math.round(cycleVaddi * cycleVaddiMonthly / _cycleRawTotal) : 0;
+            let cycleYearlyNet  = _cycleRawTotal > 0 ? Math.round(cycleVaddi * cycleVaddiYearly  / _cycleRawTotal) : 0;
 
             // Yearly totals (yearly reset button ஆளுகை)
             let currentYearVaddi  = totalVattiEarnedAllTime - yearlyVaddiBase;  if (currentYearVaddi  < 0) currentYearVaddi  = 0;
@@ -1244,8 +1240,8 @@
             // Cycle breakdown — Monthly/Yearly
             let cmEl = document.getElementById('dbCycleMonthly');
             let cyEl = document.getElementById('dbCycleYearly');
-            if (cmEl) cmEl.innerText = '₹' + cycleVaddiMonthly.toLocaleString('en-IN');
-            if (cyEl) cyEl.innerText = '₹' + cycleVaddiYearly.toLocaleString('en-IN');
+            if (cmEl) cmEl.innerText = '₹' + cycleMonthlyNet.toLocaleString('en-IN');
+            if (cyEl) cyEl.innerText = '₹' + cycleYearlyNet.toLocaleString('en-IN');
 
             // Year vaddi breakdown — proportional split
             let ymEl = document.getElementById('dbYearMonthly');
@@ -2555,7 +2551,7 @@
             }
 
             showLoading(false);
-            calculateDashboard(allRows);
+            calculateDashboard(allRows.filter(r => String(r.accounttype||'').toLowerCase().trim() !== 'app_settings'));
             toast('புதிய 25 நாள் சுழற்சி தொடங்கியது! 🔄 (' + activeLoans.length + ' நபர்கள் Reset)');
             fetchDocs();
         }
@@ -2585,7 +2581,7 @@
             // Refresh myCapital from storage before recalculating
             myCapital = parseFloat(safeGetLocal('myCapital', '0') || 0);
             // Capital is intentionally kept — only dashboard cycle/yearly numbers reset
-            calculateDashboard(allRows);
+            calculateDashboard(allRows.filter(r => String(r.accounttype||'').toLowerCase().trim() !== 'app_settings'));
             toast('புதிய கணக்கு ஆண்டு தொடங்கியது! 🗓️ கோவில் நிதி பாதுகாப்பாக உள்ளது ✅');
             switchPage(1);
         }
