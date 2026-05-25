@@ -1401,14 +1401,17 @@
                 let hasNewAsalRows  = allRows.some(r => String(r.accounttype||'').toLowerCase().trim() === 'asal_return'  && String(r.loanRefId||'') !== '' && parseInt(r.loanRefId) === parseInt(row.id||0));
                 let hasNewVaddiRows = allRows.some(r => String(r.accounttype||'').toLowerCase().trim() === 'vaddi_vasool' && String(r.loanRefId||'') !== '' && parseInt(r.loanRefId) === parseInt(row.id||0));
 
-                // கடன் கொடுத்த மூல தொகை opening-ல் கழி
-                let loanGivenAmt = hasNewAsalRows ? currentAmt : (currentAmt + oldAsalAmt);
-                runningBalance -= loanGivenAmt;
+                // கடன் கொடுத்த மூல தொகை opening-ல் கழி (எப்போதும் original loan amount மட்டும்)
+                runningBalance -= currentAmt;
 
-                // பழைய system: vaddi / asal tனி rows இல்லை → field-இல் இருந்து opening-ல் கூட்டு
+                // பழைய system: vaddi / asal தனி rows இல்லை → field-இல் இருந்து opening-ல் கூட்டு
                 if (!hasNewVaddiRows && oldVaddiAmt > 0) runningBalance += oldVaddiAmt;
                 if (!hasNewAsalRows  && oldAsalAmt  > 0) runningBalance += oldAsalAmt;
             });
+
+            // ★ NOTE: asal_return & vaddi_vasool pre-range rows already handled in preRows above.
+            // The key fix above is: loan opening now uses only currentAmt (not currentAmt + oldAsalAmt),
+            // so closed loans' returned asal (via asal_return rows in preRows) correctly nets to zero.
 
             // helper: 8-col row builder
             let stmtRowCounter = 0;
