@@ -1369,49 +1369,51 @@
             let runningBalance = openingCapital;
             let tableHtml = '';
 
+            // ★ Opening balance calculation:
+            // 1) Non-loan, non-payment pre-range rows (varavu/selavu)
             let preRows = sortedRows.filter(row => {
                 let actType = String(row.accounttype || '').toLowerCase().trim();
-                if (actType === 'app_settings') return false; // ★ settings rows விலக்கு
-                let isLoan = actType === 'kadan' || actType === 'loan_given' || actType === 'varavu';
-                if (isLoan) return false;
+                if (actType === 'app_settings') return false;
+                // loan rows, vaddi_vasool, asal_return — தனியா handle பண்ணுவோம்
+                if (actType === 'kadan' || actType === 'loan_given' || actType === 'varavu') return false;
+                if (actType === 'vaddi_vasool' || actType === 'asal_return') return false;
                 return row.jsDate < fromDate;
             });
             preRows.forEach(row => {
                 let amt = parseFloat(row.amount || 0);
                 let actType = String(row.accounttype || '').toLowerCase().trim();
-                if (actType === 'vaddi_vasool' || actType === 'asal_return') {
-                    runningBalance += amt;
-                } else if (actType === 'nankodai' || actType === 'varavu_idhar' || actType === 'varavu idhar') {
+                if (actType === 'nankodai' || actType === 'varavu_idhar' || actType === 'varavu idhar') {
                     runningBalance += amt;
                 } else if (actType === 'sela_porul' || actType === 'selavu') {
                     runningBalance -= amt;
                 }
             });
-            
-            // NOTE: loan effect இல்லை opening balance-ல்
-            // Statement rows-லயே loan given → செலவு, vaddi/asal → வரவு காட்டுவோம்
-            // preRows-ல் date range-க்கு முன்னாடி உள்ள loans மட்டும் opening-ல் போடு
+
+            // 2) Pre-range loan rows — கடன் கொடுத்தது கழி, பழைய vaddi/asal கூட்டு
             sortedRows.filter(row => {
                 let actType = String(row.accounttype || '').toLowerCase().trim();
                 return (actType === 'kadan' || actType === 'loan_given' || actType === 'varavu') && row.jsDate < fromDate;
             }).forEach(row => {
-                let currentAmt = parseFloat(row.amount || 0);
-                let oldAsalAmt = parseFloat(row.thirumbiyaAsalSum || 0);
-                let oldVaddiAmt= parseFloat(row.collectedVaddi || 0);
-                let hasNewAsalRows  = allRows.some(r => String(r.accounttype||'').toLowerCase().trim() === 'asal_return'  && String(r.loanRefId||'') !== '' && parseInt(r.loanRefId) === parseInt(row.id||0));
-                let hasNewVaddiRows = allRows.some(r => String(r.accounttype||'').toLowerCase().trim() === 'vaddi_vasool' && String(r.loanRefId||'') !== '' && parseInt(r.loanRefId) === parseInt(row.id||0));
+                let currentAmt  = parseFloat(row.amount || 0);
+                let oldAsalAmt  = parseFloat(row.thirumbiyaAsalSum || 0);
+                let oldVaddiAmt = parseFloat(row.collectedVaddi || 0);
+                let hasNewAsalRows  = allRows.some(r => String(r.accounttype||'').toLowerCase().trim() === 'asal_return'  && parseInt(r.loanRefId||0) === parseInt(row.id||0));
+                let hasNewVaddiRows = allRows.some(r => String(r.accounttype||'').toLowerCase().trim() === 'vaddi_vasool' && parseInt(r.loanRefId||0) === parseInt(row.id||0));
 
-                // கடன் கொடுத்த மூல தொகை opening-ல் கழி (எப்போதும் original loan amount மட்டும்)
                 runningBalance -= currentAmt;
 
-                // பழைய system: vaddi / asal தனி rows இல்லை → field-இல் இருந்து opening-ல் கூட்டு
+                // பழைய system fallback (தனி rows இல்லை)
                 if (!hasNewVaddiRows && oldVaddiAmt > 0) runningBalance += oldVaddiAmt;
                 if (!hasNewAsalRows  && oldAsalAmt  > 0) runningBalance += oldAsalAmt;
             });
 
-            // ★ NOTE: asal_return & vaddi_vasool pre-range rows already handled in preRows above.
-            // The key fix above is: loan opening now uses only currentAmt (not currentAmt + oldAsalAmt),
-            // so closed loans' returned asal (via asal_return rows in preRows) correctly nets to zero.
+            // 3) Pre-range vaddi_vasool & asal_return rows (புதிய system) — தனியா கூட்டு
+            sortedRows.filter(row => {
+                let actType = String(row.accounttype || '').toLowerCase().trim();
+                return (actType === 'vaddi_vasool' || actType === 'asal_return') && row.jsDate < fromDate;
+            }).forEach(row => {
+                runningBalance += parseFloat(row.amount || 0);
+            });
 
             // helper: 8-col row builder
             let stmtRowCounter = 0;
