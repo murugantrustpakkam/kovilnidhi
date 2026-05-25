@@ -1389,24 +1389,11 @@
                 let actType = String(row.accounttype || '').toLowerCase().trim();
                 return (actType === 'kadan' || actType === 'loan_given' || actType === 'varavu') && row.jsDate < fromDate;
             }).forEach(row => {
-                let thirumbiyaAsal = parseFloat(row.thirumbiyaAsalSum || 0);
-                let currentAmt    = parseFloat(row.amount || 0);
-                let originalAmt   = currentAmt + thirumbiyaAsal;
-                let vaddiAmt      = parseFloat(row.collectedVaddi || 0);
-                // கடன் கொடுத்தது → செலவு (opening-ல் கழி)
-                runningBalance -= originalAmt;
-                // வட்டி திரும்பியது → vaddiCollectedDate < fromDate ஆனால் மட்டும் opening-ல் கூட்டு
-                let vaddiDateStr = row.vaddiCollectedDate || row.lastCollectedDate || '';
-                let vaddiJsDate  = parseRowDate(vaddiDateStr);
-                if (!vaddiDateStr || isNaN(vaddiJsDate) || vaddiJsDate < fromDate) {
-                    runningBalance += vaddiAmt;
-                }
-                // அசல் திரும்பியது → asalCollectedDate < fromDate ஆனால் மட்டும் opening-ல் கூட்டு
-                let asalDateStr  = row.asalCollectedDate || row.lastCollectedDate || '';
-                let asalJsDate   = parseRowDate(asalDateStr);
-                if (!asalDateStr || isNaN(asalJsDate) || asalJsDate < fromDate) {
-                    runningBalance += thirumbiyaAsal;
-                }
+                let currentAmt = parseFloat(row.amount || 0);
+                // கடன் கொடுத்தது → opening-ல் கழி (active அசல் மட்டும்)
+                // thirumbiyaAsalSum-ஐ கூட்டவேண்டாம் — asal_return rows preRows-ல் already கூட்டப்படும்
+                runningBalance -= currentAmt;
+                // வட்டி/அசல் — vaddi_vasool, asal_return தனி rows preRows-ல் handle ஆகுது, இங்கே skip
             });
 
             // helper: 8-col row builder
@@ -1489,17 +1476,8 @@
                     });
                 }
 
-                // 3) அசல் திரும்பியது entry — asalCollectedDate range-ல் இருந்தால் மட்டும்
-                if (thirumbiyaAsal > 0 && asalJsDate >= fromDate && asalJsDate <= toDate) {
-                    expandedEntries.push({
-                        jsDate: asalJsDate,
-                        type: 'asal',
-                        render: (bal) => {
-                            let newBal = bal + thirumbiyaAsal;
-                            return { bal: newBal, html: mkRow('#e6f4ff', asalDateStr, name, typeLabel + ' அசல் திரும்பியது', thirumbiyaAsal, 0, 0, 0, newBal) };
-                        }
-                    });
-                }
+                // 3) அசல் திரும்பியது — asal_return தனி rows-ல் இருந்து count ஆகுது
+                // thirumbiyaAsalSum-ஐ இங்கே use பண்ணவில்லை — double count தவிர்க்க
             });
 
             let nonLoanInRange = inRangeRows.filter(row => {
