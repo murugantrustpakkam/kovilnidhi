@@ -152,7 +152,7 @@
                 <div class="db-card full-width-green">
                     <h4>கோவிலில் உள்ள இருப்பு நிதி (Cash In Hand)</h4>
                     <p id="dbTotal" style="color: #28a745; font-size: 22px;">₹0</p>
-                    <div class="sub-text">(ஆரம்ப முதலீடு + வந்த வட்டி + திரும்பிய அசல் + இதர வரவு - செலவு - கொடுக்கப்பட்ட கடன்)</div>
+                    <div class="sub-text">(ஆரம்ப முதலீடு + வந்த வட்டி + இதர வரவு - செலவு - கொடுக்கப்பட்ட கடன்)</div>
                 </div>
 
                 <div class="db-card orange" style="grid-column: span 2;">
@@ -1112,7 +1112,7 @@
             let currentYearSelavu = totalSelavuAllTime      - yearlySelavuBase; if (currentYearSelavu < 0) currentYearSelavu = 0;
 
             // மொத்த நிதி = capital + வட்டி + நன்கொடை + அசல்திரும்பியது - செலவு
-            let nivaMoththaNithiFormulaValue = myCapital + totalVattiEarnedAllTime + totalVaravuAllTime + totalAsalReturnAllTime - totalSelavuAllTime;
+            let nivaMoththaNithiFormulaValue = myCapital + totalVattiEarnedAllTime + totalVaravuAllTime - totalSelavuAllTime;
 
             // Liquid Cash In Hand
             let cashInHand = nivaMoththaNithiFormulaValue - currentLoansActiveOutstanding;
