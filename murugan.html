@@ -1386,17 +1386,18 @@
             });
 
             // ── 6-col row builder ──
-            // varavu > 0 → green, selavu > 0 → red, both 0 → opening/loan row
+            // Image design: selavu column = -₹X (red, negative), varavu = ₹X (green), bal = running balance after this row
             function mkRow6(bg, dateS, name, type, varavu, selavu, bal) {
-                let fmtAmt = v => v > 0 ? '&#8377;&nbsp;' + v.toLocaleString('en-IN') : '-';
-                let balColor = bal >= 0 ? '#155724' : '#721c24';
-                let td  = (v, opts) => `<td style="padding:5px 5px;border:1px solid #ddd;font-size:12px;word-break:break-word;${opts||''}">${v}</td>`;
+                let fmtVaravu = v => v > 0 ? '<span style="color:#1a7f37;font-weight:bold;">&#8377;&nbsp;' + v.toLocaleString('en-IN') + '</span>' : '<span style="color:#999;">-</span>';
+                let fmtSelavu = v => v > 0 ? '<span style="color:#c0392b;font-weight:bold;">-&#8377;&nbsp;' + v.toLocaleString('en-IN') + '</span>' : '<span style="color:#999;">-</span>';
+                let balColor  = bal >= 0 ? '#155724' : '#721c24';
+                let td = (v, opts) => `<td style="padding:5px 6px;border:1px solid #ddd;font-size:12px;word-break:break-word;${opts||''}">${v}</td>`;
                 return `<tr style="background:${bg};">
-                    ${td(dateS)}
-                    ${td('<strong>'+name+'</strong>')}
+                    ${td(dateS,'color:#555;')}
+                    ${td('<strong style="color:#2c3e50;">'+name+'</strong>')}
                     ${td(type,'color:#444;')}
-                    ${td(fmtAmt(varavu),'text-align:right;color:#1a7f37;font-weight:'+(varavu>0?'bold':'normal')+';')}
-                    ${td(fmtAmt(selavu),'text-align:right;color:#c0392b;font-weight:'+(selavu>0?'bold':'normal')+';')}
+                    ${td(fmtVaravu(varavu),'text-align:right;')}
+                    ${td(fmtSelavu(selavu),'text-align:right;')}
                     ${td('&#8377;&nbsp;'+bal.toLocaleString('en-IN'),'text-align:right;color:'+balColor+';font-weight:bold;')}
                 </tr>`;
             }
@@ -1498,6 +1499,7 @@
             entries.forEach(e => {
                 runBal += e.varavu - e.selavu;
                 e.runBal = runBal;
+                console.log('[STMT]', e.dateS, e.entryType, 'varavu:', e.varavu, 'selavu:', e.selavu, 'runBal:', runBal);
             });
 
             // ── Render: latest first (reverse), opening balance at bottom ──
@@ -1511,10 +1513,21 @@
 
             // Opening balance row
             let openFmt = fromDateVal.split('-').reverse().join('.');
-            rows.push(mkRow6('#eef2ff', openFmt,
-                'தொடக்க இருப்பு (Opening Balance)',
-                'ஆரம்ப முதலீடு: ₹' + openingCapital.toLocaleString('en-IN') + (capitalDateStr !== '—' ? ' (தேதி: ' + capitalDateStr + ')' : ''),
-                0, 0, openingBal));
+            // Opening balance row — image style: green bold bottom row
+            rows.push(`<tr style="background:#e8f5e9;border-top:2px solid #2e7d32;">
+                <td style="padding:6px 6px;border:1px solid #aaa;font-size:12px;color:#555;">${openFmt}</td>
+                <td colspan="2" style="padding:6px 6px;border:1px solid #aaa;font-size:13px;font-weight:bold;color:#1a5e20;">
+                    தொடக்க இருப்பு
+                    <span style="font-size:11px;font-weight:normal;color:#388e3c;margin-left:6px;">
+                        ஆரம்ப முதலீடு: ₹${openingCapital.toLocaleString('en-IN')}${capitalDateStr !== '—' ? ' (தேதி: ' + capitalDateStr + ')' : ''}
+                    </span>
+                </td>
+                <td style="padding:6px 6px;border:1px solid #aaa;text-align:right;color:#999;">-</td>
+                <td style="padding:6px 6px;border:1px solid #aaa;text-align:right;color:#999;">-</td>
+                <td style="padding:6px 6px;border:1px solid #aaa;text-align:right;font-weight:bold;font-size:13px;color:#1a5e20;">
+                    ₹&nbsp;${openingBal.toLocaleString('en-IN')}
+                </td>
+            </tr>`);
 
             document.getElementById('bankStatementBody').innerHTML =
                 rows.join('') || '<tr><td colspan="6" style="text-align:center;padding:16px;color:gray;">தரவுகள் எதுவும் இல்லை</td></tr>';
