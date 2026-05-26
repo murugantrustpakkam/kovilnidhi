@@ -1424,19 +1424,23 @@
                 }
 
                 if (isLoanRow(at)) {
-                    let hasNewAsal = allParsed.some(x => isAsalRow(actTypeOf(x)) && parseInt(x.loanRefId||0) === parseInt(r.id||0));
-                    // பழைய system: thirumbiyaAsalSum தனி rows இல்ல — loanGivenAmt-ல் சேர்க்க வேண்டாம்
-                    // புதிய system: amount மட்டும்
-                    let loanAmt = amt; // always just the principal (asal_return handles repayments)
+                    let loanAmt = parseFloat(r.amount || 0);
                     let ltLabel = lt === 'yearly' ? '📆 Yearly' : '📅 Monthly';
-                    let status  = String(getRowValue(r, ['status'], 'Active')).toLowerCase().trim();
-                    entries.push({ jsDate: r.jsDate, dateS, name, type: ltLabel + ' கடன் வழங்கல்' + (status==='closed'?' ✅':''), varavu: 0, selavu: loanAmt, entryType: 'loan_given' });
+                    let status  = String(getRowValue(r, ['status'], 'active')).toLowerCase().trim();
+                    let closedLabel = status === 'closed' ? ' ✅ Closed' : '';
+                    entries.push({ jsDate: r.jsDate, dateS, name, type: ltLabel + ' கடன் வழங்கல்' + closedLabel, varavu: 0, selavu: loanAmt, entryType: 'loan_given' });
                 } else if (isVaddiRow(at)) {
-                    let ltLabel = lt === 'yearly' ? '📆 Yearly' : '📅 Monthly';
+                    let parent  = allParsed.find(x => isLoanRow(actTypeOf(x)) && parseInt(x.id||0) === parseInt(r.loanRefId||0));
+                    let pLt     = parent ? String(getRowValue(parent,['loanType'],'monthly')).toLowerCase().trim() : lt;
+                    let ltLabel = pLt === 'yearly' ? '📆 Yearly' : '📅 Monthly';
                     entries.push({ jsDate: r.jsDate, dateS, name, type: ltLabel + ' வட்டி வசூல்', varavu: amt, selavu: 0, entryType: 'vaddi' });
                 } else if (isAsalRow(at)) {
-                    let ltLabel = lt === 'yearly' ? '📆 Yearly' : '📅 Monthly';
-                    entries.push({ jsDate: r.jsDate, dateS, name, type: ltLabel + ' அசல் வாங்கியது', varavu: amt, selavu: 0, entryType: 'asal' });
+                    let parent  = allParsed.find(x => isLoanRow(actTypeOf(x)) && parseInt(x.id||0) === parseInt(r.loanRefId||0));
+                    let pLt     = parent ? String(getRowValue(parent,['loanType'],'monthly')).toLowerCase().trim() : lt;
+                    let pStatus = parent ? String(getRowValue(parent,['status'],'active')).toLowerCase().trim() : 'active';
+                    let ltLabel = pLt === 'yearly' ? '📆 Yearly' : '📅 Monthly';
+                    let closedLabel = pStatus === 'closed' ? ' ✅ Closed' : '';
+                    entries.push({ jsDate: r.jsDate, dateS, name, type: ltLabel + ' அசல் வாங்கியது' + closedLabel, varavu: amt, selavu: 0, entryType: 'asal' });
                 } else if (isVaravuRow(at)) {
                     let desc = (r.description && r.description !== '-') ? r.description : name;
                     entries.push({ jsDate: r.jsDate, dateS, name: desc, type: 'இதர வரவு', varavu: amt, selavu: 0, entryType: 'varavu' });
@@ -1482,7 +1486,13 @@
             });
 
             // ── Sort ascending (oldest first) → calculate running balance ──
-            entries.sort((a, b) => a.jsDate - b.jsDate || 0);
+            // Same date-ல் order: கடன் கொடுத்தது → வட்டி → அசல் (closed கடைசி)
+            const entryOrder = { loan_given: 1, vaddi: 2, asal: 3, varavu: 4, selavu: 5 };
+            entries.sort((a, b) => {
+                let dateDiff = a.jsDate - b.jsDate;
+                if (dateDiff !== 0) return dateDiff;
+                return (entryOrder[a.entryType] || 9) - (entryOrder[b.entryType] || 9);
+            });
 
             let runBal = openingBal;
             entries.forEach(e => {
