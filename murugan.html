@@ -1499,7 +1499,7 @@
             entries.forEach(e => {
                 runBal += e.varavu - e.selavu;
                 e.runBal = runBal;
-                console.log('[STMT]', e.dateS, e.entryType, 'varavu:', e.varavu, 'selavu:', e.selavu, 'runBal:', runBal);
+                console.log('[STMT]', e.dateS, e.entryType, 'varavu:', e.varavu, 'selavu:', e.selavu, 'runBal:', runBal, 'raw_amount:', e.amount, 'raw_loanRefId:', e.loanRefId);
             });
 
             // ── Render: latest first (reverse), opening balance at bottom ──
