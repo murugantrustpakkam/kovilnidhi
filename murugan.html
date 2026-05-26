@@ -2851,7 +2851,7 @@
                 fetchDocs(true);
             }, 10 * 60 * 1000);
 
-            document.addEventListener('visibilitychange', function() {
+            (function() {
                 if (document.visibilityState === 'visible') {
                     let timeSinceFetch = Date.now() - lastFetchTime;
                     if (timeSinceFetch > 60 * 1000) {
