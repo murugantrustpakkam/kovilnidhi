@@ -466,32 +466,25 @@
                 </div>
 
                 <div id="sectionBankPassbook">
-                    <h3 style="color: #007bff; font-size: 14px; margin: 0 0 4px 0; font-weight: bold;">🟢🔴 வங்கி வரவு - செலவு கணக்கு அறிக்கை (Passbook Statement)</h3>
-                    <div style="background:#fff8e1;border-left:3px solid #ffc107;padding:6px 10px;font-size:11px;color:#856404;margin-bottom:8px;border-radius:0 4px 4px 0;">
-                        ℹ️ <strong>குறிப்பு:</strong> கடன் பரிவர்த்தனைகள் (நாரை வரிசைகள்) எல்லா காலத்துக்கும் காட்டப்படுகின்றன — collection date தனியே store ஆகாததால். வரவு/செலவு entries மட்டும் தேர்ந்த தேதி வரம்பில் காட்டப்படும்.
-                    </div>
+                    <h3 style="color: #007bff; font-size: 14px; margin: 0 0 8px 0; font-weight: bold;">🟢🔴 வங்கி வரவு - செலவு கணக்கு அறிக்கை (Passbook Statement)</h3>
                     <div style="overflow-x: auto; margin-bottom: 25px;">
-                        <table id="bankStatementTable" style="width:100%; border-collapse: collapse; font-size: 11px; table-layout: fixed;">
+                        <table id="bankStatementTable" style="width:100%; border-collapse: collapse; font-size: 12px; table-layout: fixed;">
                             <colgroup>
-                                <col style="width:72px;">  <!-- தேதி -->
-                                <col style="width:110px;"> <!-- நபர் -->
-                                <col style="width:100px;"> <!-- வகை -->
-                                <col style="width:75px;">  <!-- வரவு அசல் -->
-                                <col style="width:75px;">  <!-- வரவு வட்டி -->
-                                <col style="width:75px;">  <!-- வரவு பிற -->
-                                <col style="width:75px;">  <!-- செலவு -->
-                                <col style="width:80px;">  <!-- இருப்பு -->
+                                <col style="width:82px;">  <!-- தேதி -->
+                                <col style="width:130px;"> <!-- பெயர்கள் -->
+                                <col style="width:160px;"> <!-- வகை -->
+                                <col style="width:90px;">  <!-- வரவு -->
+                                <col style="width:90px;">  <!-- செலவு -->
+                                <col style="width:100px;"> <!-- இருப்பு -->
                             </colgroup>
                             <thead>
-                                <tr style="background:#2c3e50; color:white; font-size:10px;">
-                                    <th style="padding:5px 4px; text-align:left; border:1px solid #555; word-break:break-word;">தேதி</th>
-                                    <th style="padding:5px 4px; text-align:left; border:1px solid #555; word-break:break-word;">நபர்</th>
-                                    <th style="padding:5px 4px; text-align:left; border:1px solid #555; word-break:break-word;">வகை</th>
-                                    <th style="padding:5px 4px; text-align:right; color:#2ecc71; border:1px solid #555; word-break:break-word;">அசல் 🟢</th>
-                                    <th style="padding:5px 4px; text-align:right; color:#f9d56e; border:1px solid #555; word-break:break-word;">வட்டி 🟡</th>
-                                    <th style="padding:5px 4px; text-align:right; color:#2ecc71; border:1px solid #555; word-break:break-word;">இதர வரவு 🟢</th>
-                                    <th style="padding:5px 4px; text-align:right; color:#e74c3c; border:1px solid #555; word-break:break-word;">செலவு 🔴</th>
-                                    <th style="padding:5px 4px; text-align:right; border:1px solid #555; word-break:break-word;">இருப்பு</th>
+                                <tr style="background:#2c3e50; color:white; font-size:11px;">
+                                    <th style="padding:6px 5px; text-align:left; border:1px solid #555;">தேதி</th>
+                                    <th style="padding:6px 5px; text-align:left; border:1px solid #555;">பெயர்கள்</th>
+                                    <th style="padding:6px 5px; text-align:left; border:1px solid #555;">வகை</th>
+                                    <th style="padding:6px 5px; text-align:right; color:#6eff9e; border:1px solid #555;">வரவு 🟢</th>
+                                    <th style="padding:6px 5px; text-align:right; color:#ff8080; border:1px solid #555;">செலவு 🔴</th>
+                                    <th style="padding:6px 5px; text-align:right; border:1px solid #555;">இருப்பு</th>
                                 </tr>
                             </thead>
                             <tbody id="bankStatementBody"></tbody>
@@ -1327,286 +1320,199 @@
 
         function generateBankStatement() {
             let fromDateVal = document.getElementById('stmtFromDate').value;
-            let toDateVal = document.getElementById('stmtToDate').value;
-            
-            if(!fromDateVal || !toDateVal) { alert("தேதியைத் தேர்ந்தெடுங்க பாஸ்!"); return; }
-            
+            let toDateVal   = document.getElementById('stmtToDate').value;
+            if (!fromDateVal || !toDateVal) { alert("தேதியைத் தேர்ந்தெடுங்க பாஸ்!"); return; }
+
             let fp = fromDateVal.split('-');
             let tp = toDateVal.split('-');
             let fromDate = new Date(parseInt(fp[0]), parseInt(fp[1]) - 1, parseInt(fp[2]), 0, 0, 0, 0);
             let toDate   = new Date(parseInt(tp[0]), parseInt(tp[1]) - 1, parseInt(tp[2]), 23, 59, 59, 999);
 
-            // Filter values
-            let loanTypeFilter = document.getElementById('stmtLoanTypeFilter').value; // ALL / monthly / yearly
-            let personFilter   = document.getElementById('stmtPersonFilter').value;   // ALL / <name>
+            let loanTypeFilter = document.getElementById('stmtLoanTypeFilter').value;
+            let bankFilter     = document.getElementById('stmtBankFilter') ? document.getElementById('stmtBankFilter').value : 'ALL';
 
-            // Person dropdown populate (loan persons only)
+            // Person dropdown populate
             let loanPersons = [...new Set(allRows
                 .filter(r => { let t = String(getRowValue(r,['accounttype'],'')).toLowerCase().trim(); return t==='kadan'||t==='varavu'; })
                 .map(r => String(getRowValue(r,['receiverName'],'') || '').trim())
                 .filter(n => n)
             )].sort();
             let personSel = document.getElementById('stmtPersonFilter');
-            let currentVal = personSel.value;
+            let savedPerson = personSel.value;
             personSel.innerHTML = '<option value="ALL">👥 அனைத்து நபர்களும்</option>' +
-                loanPersons.map(n => `<option value="${n}" ${currentVal===n?'selected':''}>${n}</option>`).join('');
-            personFilter = personSel.value;
-            
-            document.getElementById('stmtPeriodText').innerText = `கால அளவு: ${fromDateVal.split('-').reverse().join('.')} முதல் ${toDateVal.split('-').reverse().join('.')} வரை`;
+                loanPersons.map(n => `<option value="${n}" ${savedPerson===n?'selected':''}>${n}</option>`).join('');
+            let personFilter = personSel.value;
 
-            let sortedRows = [...allRows].map(row => {
-                let rowDate = parseRowDate(row.date);
-                return { ...row, jsDate: rowDate };
-            }).filter(row => {
-                // ★ app_settings rows (capital, bank_balance, temple_details) statement-ல் வரக்கூடாது
-                let at = String(row.accounttype || '').toLowerCase().trim();
-                if (at === 'app_settings') return false;
-                return !isNaN(row.jsDate);
-            }).sort((a, b) => a.jsDate - b.jsDate);
+            document.getElementById('stmtPeriodText').innerText =
+                `கால அளவு: ${fromDateVal.split('-').reverse().join('.')} முதல் ${toDateVal.split('-').reverse().join('.')} வரை`;
 
+            // ── Row type helpers ──
+            function actTypeOf(row) { return String(row.accounttype || '').toLowerCase().trim(); }
+            function isLoanRow(at)  { return at === 'kadan' || at === 'loan_given'; }
+            function isVaddiRow(at) { return at === 'vaddi_vasool'; }
+            function isAsalRow(at)  { return at === 'asal_return'; }
+            function isVaravuRow(at){ return at === 'nankodai' || at === 'varavu_idhar' || at === 'varavu idhar' || at === 'varavu'; }
+            function isSelavuRow(at){ return at === 'sela_porul' || at === 'selavu'; }
+
+            // ── Parse + attach jsDate to every row, skip app_settings ──
+            let allParsed = allRows
+                .filter(r => actTypeOf(r) !== 'app_settings')
+                .map(r => ({ ...r, jsDate: parseRowDate(r.date) }))
+                .filter(r => !isNaN(r.jsDate));
+
+            // ── Opening balance: capital + all transactions BEFORE fromDate ──
             let openingCapital = parseFloat(safeGetLocal('myCapital', '0') || 0);
-            let capitalDate = safeGetLocal('myCapitalDate', '') || '—';
-            let runningBalance = openingCapital;
-            let tableHtml = '';
+            let capitalDateStr = safeGetLocal('myCapitalDate', '') || '—';
+            let openingBal = openingCapital;
 
-            // ★ Opening balance calculation:
-            // 1) Non-loan, non-payment pre-range rows (varavu/selavu)
-            let preRows = sortedRows.filter(row => {
-                let actType = String(row.accounttype || '').toLowerCase().trim();
-                if (actType === 'app_settings') return false;
-                // loan rows, vaddi_vasool, asal_return — தனியா handle பண்ணுவோம்
-                if (actType === 'kadan' || actType === 'loan_given' || actType === 'varavu') return false;
-                if (actType === 'vaddi_vasool' || actType === 'asal_return') return false;
-                return row.jsDate < fromDate;
-            });
-            preRows.forEach(row => {
-                let amt = parseFloat(row.amount || 0);
-                let actType = String(row.accounttype || '').toLowerCase().trim();
-                if (actType === 'nankodai' || actType === 'varavu_idhar' || actType === 'varavu idhar') {
-                    runningBalance += amt;
-                } else if (actType === 'sela_porul' || actType === 'selavu') {
-                    runningBalance -= amt;
+            allParsed.filter(r => r.jsDate < fromDate).forEach(r => {
+                let at  = actTypeOf(r);
+                let amt = parseFloat(r.amount || 0);
+                if (isLoanRow(at)) {
+                    // கடன் கொடுத்தோம் → cash குறைஞ்சது
+                    openingBal -= amt;
+                    // பழைய system: தனி rows இல்லன்னா field-லேயே இருக்கும்
+                    let hasNewVaddi = allParsed.some(x => isVaddiRow(actTypeOf(x)) && parseInt(x.loanRefId||0) === parseInt(r.id||0));
+                    let hasNewAsal  = allParsed.some(x => isAsalRow(actTypeOf(x))  && parseInt(x.loanRefId||0) === parseInt(r.id||0));
+                    if (!hasNewVaddi) openingBal += parseFloat(r.collectedVaddi    || 0);
+                    if (!hasNewAsal)  openingBal += parseFloat(r.thirumbiyaAsalSum || 0);
+                } else if (isVaddiRow(at) || isAsalRow(at)) {
+                    openingBal += amt; // வட்டி/அசல் வந்தது → cash கூடியது
+                } else if (isVaravuRow(at)) {
+                    openingBal += amt;
+                } else if (isSelavuRow(at)) {
+                    openingBal -= amt;
                 }
             });
 
-            // 2) Pre-range loan rows — கடன் கொடுத்தது கழி, பழைய vaddi/asal கூட்டு
-            sortedRows.filter(row => {
-                let actType = String(row.accounttype || '').toLowerCase().trim();
-                return (actType === 'kadan' || actType === 'loan_given' || actType === 'varavu') && row.jsDate < fromDate;
-            }).forEach(row => {
-                let currentAmt  = parseFloat(row.amount || 0);
-                let oldAsalAmt  = parseFloat(row.thirumbiyaAsalSum || 0);
-                let oldVaddiAmt = parseFloat(row.collectedVaddi || 0);
-                let hasNewAsalRows  = allRows.some(r => String(r.accounttype||'').toLowerCase().trim() === 'asal_return'  && parseInt(r.loanRefId||0) === parseInt(row.id||0));
-                let hasNewVaddiRows = allRows.some(r => String(r.accounttype||'').toLowerCase().trim() === 'vaddi_vasool' && parseInt(r.loanRefId||0) === parseInt(row.id||0));
-
-                runningBalance -= currentAmt;
-
-                // பழைய system fallback (தனி rows இல்லை)
-                if (!hasNewVaddiRows && oldVaddiAmt > 0) runningBalance += oldVaddiAmt;
-                if (!hasNewAsalRows  && oldAsalAmt  > 0) runningBalance += oldAsalAmt;
-            });
-
-            // 3) Pre-range vaddi_vasool & asal_return rows (புதிய system) — தனியா கூட்டு
-            sortedRows.filter(row => {
-                let actType = String(row.accounttype || '').toLowerCase().trim();
-                return (actType === 'vaddi_vasool' || actType === 'asal_return') && row.jsDate < fromDate;
-            }).forEach(row => {
-                runningBalance += parseFloat(row.amount || 0);
-            });
-
-            // helper: 8-col row builder
-            let stmtRowCounter = 0;
-            function mkRow(bg, dateS, name, type, colAsal, colVaddi, colPirar, colSelavu, bal) {
-                let td = (v, right, color, bold) => `<td style="padding:4px 4px;border:1px solid #ddd;font-size:11px;word-break:break-word;${right?'text-align:right;':''}${color?'color:'+color+';':''}${bold?'font-weight:bold;':''}">${v}</td>`;
-                return `<tr style="background:${bg};">${td(dateS,0,'','')
-                    }${td(name,0,'','')
-                    }${td(type,0,'#444','')
-                    }${td(colAsal?'&#8377;'+colAsal.toLocaleString('en-IN'):'-',1,'#27ae60',!!colAsal)
-                    }${td(colVaddi?'&#8377;'+colVaddi.toLocaleString('en-IN'):'-',1,'#c07d00',!!colVaddi)
-                    }${td(colPirar?'&#8377;'+colPirar.toLocaleString('en-IN'):'-',1,'#2ecc71',!!colPirar)
-                    }${td(colSelavu?'&#8377;'+colSelavu.toLocaleString('en-IN'):'-',1,'#e74c3c',!!colSelavu)
-                    }${td('&#8377;'+bal.toLocaleString('en-IN'),1,'#2c3e50',true)}</tr>`;
+            // ── 6-col row builder ──
+            // varavu > 0 → green, selavu > 0 → red, both 0 → opening/loan row
+            function mkRow6(bg, dateS, name, type, varavu, selavu, bal) {
+                let fmtAmt = v => v > 0 ? '&#8377;&nbsp;' + v.toLocaleString('en-IN') : '-';
+                let balColor = bal >= 0 ? '#155724' : '#721c24';
+                let td  = (v, opts) => `<td style="padding:5px 5px;border:1px solid #ddd;font-size:12px;word-break:break-word;${opts||''}">${v}</td>`;
+                return `<tr style="background:${bg};">
+                    ${td(dateS)}
+                    ${td('<strong>'+name+'</strong>')}
+                    ${td(type,'color:#444;')}
+                    ${td(fmtAmt(varavu),'text-align:right;color:#1a7f37;font-weight:'+(varavu>0?'bold':'normal')+';')}
+                    ${td(fmtAmt(selavu),'text-align:right;color:#c0392b;font-weight:'+(selavu>0?'bold':'normal')+';')}
+                    ${td('&#8377;&nbsp;'+bal.toLocaleString('en-IN'),'text-align:right;color:'+balColor+';font-weight:bold;')}
+                </tr>`;
             }
 
-            // Bank section filter
-            let bankFilter = document.getElementById('stmtBankFilter') ? document.getElementById('stmtBankFilter').value : 'ALL';
+            // ── Build flat transaction list for the selected date range ──
+            let entries = []; // { jsDate, entryDate, name, type, varavu, selavu, entryType }
 
-            let inRangeRows = sortedRows.filter(row => row.jsDate >= fromDate && row.jsDate <= toDate);
+            allParsed.filter(r => r.jsDate >= fromDate && r.jsDate <= toDate).forEach(r => {
+                let at   = actTypeOf(r);
+                let amt  = parseFloat(r.amount || 0);
+                let name = String(getRowValue(r, ['receiverName'], r.name || 'விவரமில்லை')).trim() || 'விவரமில்லை';
+                let dateS = r.date || '-';
+                let lt   = String(r.loanType || 'monthly').toLowerCase().trim();
 
-            // ── Loan rows-ஐ தனி entries-ஆக expand பண்ணு (கடன், வட்டி, அசல் தனி தனியா) ──
-            let personFilter2 = document.getElementById('stmtPersonFilter').value;
-            let loanTypeFilter2 = document.getElementById('stmtLoanTypeFilter').value;
-
-            let expandedEntries = []; // { jsDate, renderFn } format
-
-            sortedRows.forEach(row => {
-                let actType = String(row.accounttype || '').toLowerCase().trim();
-                let isLoan = actType === 'kadan' || actType === 'loan_given' || actType === 'varavu';
-                if (!isLoan) return;
-
-                let rowName = String(getRowValue(row, ['receiverName'], '') || '').trim();
-                if (personFilter2 !== 'ALL' && rowName !== personFilter2) return;
-                let rowLoanType = String(getRowValue(row, ['loanType'], 'monthly')).toLowerCase().trim();
-                if (loanTypeFilter2 !== 'ALL' && rowLoanType !== loanTypeFilter2) return;
-
-                let name        = rowName || 'விவரமில்லை';
-                let dateStr     = row.date || '-';
-                let loanJsDate  = row.jsDate;
-                let currentAmt  = parseFloat(row.amount || 0);
-                let loanStatus  = String(getRowValue(row, ['status'], 'Active')).toLowerCase().trim();
-                let statusLabel = loanStatus === 'active' ? '🟡 Active' : '✅ Closed';
-                let typeLabel   = rowLoanType === 'yearly' ? '📆 Yearly' : '📅 Monthly';
-
-                // இந்த loan-க்கு vaddi_vasool / asal_return தனி rows இருக்கா என்று check
-                let hasNewVaddiRows = allRows.some(r => String(r.accounttype||'').toLowerCase().trim() === 'vaddi_vasool' && String(r.loanRefId||'') !== '' && parseInt(r.loanRefId) === parseInt(row.id||0));
-                let hasNewAsalRows  = allRows.some(r => String(r.accounttype||'').toLowerCase().trim() === 'asal_return'  && String(r.loanRefId||'') !== '' && parseInt(r.loanRefId) === parseInt(row.id||0));
-
-                // பழைய system fallback fields
-                let oldVaddiAmt = parseFloat(row.collectedVaddi || 0);
-                let oldAsalAmt  = parseFloat(row.thirumbiyaAsalSum || 0);
-
-                // கடன் கொடுத்த மூல தொகை:
-                // புதிய → current amount மட்டும் (asal_return rows தனியா handle பண்ணும்)
-                // பழைய → current + thirumbiyaAsal (தனி rows இல்லை)
-                let loanGivenAmt = hasNewAsalRows ? currentAmt : (currentAmt + oldAsalAmt);
-
-                // 1) கடன் கொடுத்தது entry
-                if (loanJsDate >= fromDate && loanJsDate <= toDate) {
-                    expandedEntries.push({
-                        jsDate: loanJsDate,
-                        type: 'loan_given',
-                        render: (bal) => {
-                            let newBal = bal - loanGivenAmt;
-                            return { bal: newBal, html: mkRow('#fff8f0', dateStr, name, typeLabel + ' கடன் — ' + statusLabel, 0, 0, 0, loanGivenAmt, newBal) };
-                        }
-                    });
-                }
-
-                // 2) வட்டி வசூல் — புதிய system: vaddi_vasool rows handle பண்ணும்
-                //                   பழைய system: collectedVaddi field use பண்ணு
-                if (!hasNewVaddiRows && oldVaddiAmt > 0) {
-                    let vaddiDateStr = row.vaddiCollectedDate || row.lastCollectedDate || dateStr;
-                    let vaddiJsDate  = parseRowDate(vaddiDateStr);
-                    if (isNaN(vaddiJsDate)) { vaddiDateStr = dateStr; vaddiJsDate = loanJsDate; }
-                    if (vaddiJsDate >= fromDate && vaddiJsDate <= toDate) {
-                        expandedEntries.push({
-                            jsDate: vaddiJsDate, type: 'vaddi',
-                            render: (bal) => {
-                                let newBal = bal + oldVaddiAmt;
-                                return { bal: newBal, html: mkRow('#f0fff4', vaddiDateStr, name, typeLabel + ' வட்டி வசூல் (பழைய)', 0, oldVaddiAmt, 0, 0, newBal) };
-                            }
-                        });
+                // Person / loan type filter (only for loan-related rows)
+                if (isLoanRow(at) || isVaddiRow(at) || isAsalRow(at)) {
+                    if (personFilter !== 'ALL' && name !== personFilter) return;
+                    let rowLT = lt;
+                    if (isVaddiRow(at) || isAsalRow(at)) {
+                        // refId மூலம் parent loan கண்டுபிடி
+                        let parent = allParsed.find(x => isLoanRow(actTypeOf(x)) && parseInt(x.id||0) === parseInt(r.loanRefId||0));
+                        if (parent) rowLT = String(getRowValue(parent,['loanType'],'monthly')).toLowerCase().trim();
                     }
+                    if (loanTypeFilter !== 'ALL' && rowLT !== loanTypeFilter) return;
                 }
 
-                // 3) அசல் திரும்பியது — புதிய system: asal_return rows handle பண்ணும்
-                //                        பழைய system: thirumbiyaAsalSum field use பண்ணு
-                if (!hasNewAsalRows && oldAsalAmt > 0) {
-                    let asalDateStr = row.asalCollectedDate || row.lastCollectedDate || dateStr;
-                    let asalJsDate  = parseRowDate(asalDateStr);
-                    if (isNaN(asalJsDate)) { asalDateStr = dateStr; asalJsDate = loanJsDate; }
-                    if (asalJsDate >= fromDate && asalJsDate <= toDate) {
-                        expandedEntries.push({
-                            jsDate: asalJsDate, type: 'asal',
-                            render: (bal) => {
-                                let newBal = bal + oldAsalAmt;
-                                return { bal: newBal, html: mkRow('#e6f4ff', asalDateStr, name, typeLabel + ' அசல் திரும்பியது (பழைய)', oldAsalAmt, 0, 0, 0, newBal) };
-                            }
-                        });
+                if (isLoanRow(at)) {
+                    let hasNewAsal = allParsed.some(x => isAsalRow(actTypeOf(x)) && parseInt(x.loanRefId||0) === parseInt(r.id||0));
+                    // பழைய system: thirumbiyaAsalSum தனி rows இல்ல — loanGivenAmt-ல் சேர்க்க வேண்டாம்
+                    // புதிய system: amount மட்டும்
+                    let loanAmt = amt; // always just the principal (asal_return handles repayments)
+                    let ltLabel = lt === 'yearly' ? '📆 Yearly' : '📅 Monthly';
+                    let status  = String(getRowValue(r, ['status'], 'Active')).toLowerCase().trim();
+                    entries.push({ jsDate: r.jsDate, dateS, name, type: ltLabel + ' கடன் வழங்கல்' + (status==='closed'?' ✅':''), varavu: 0, selavu: loanAmt, entryType: 'loan_given' });
+                } else if (isVaddiRow(at)) {
+                    let ltLabel = lt === 'yearly' ? '📆 Yearly' : '📅 Monthly';
+                    entries.push({ jsDate: r.jsDate, dateS, name, type: ltLabel + ' வட்டி வசூல்', varavu: amt, selavu: 0, entryType: 'vaddi' });
+                } else if (isAsalRow(at)) {
+                    let ltLabel = lt === 'yearly' ? '📆 Yearly' : '📅 Monthly';
+                    entries.push({ jsDate: r.jsDate, dateS, name, type: ltLabel + ' அசல் வாங்கியது', varavu: amt, selavu: 0, entryType: 'asal' });
+                } else if (isVaravuRow(at)) {
+                    let desc = (r.description && r.description !== '-') ? r.description : name;
+                    entries.push({ jsDate: r.jsDate, dateS, name: desc, type: 'இதர வரவு', varavu: amt, selavu: 0, entryType: 'varavu' });
+                } else if (isSelavuRow(at)) {
+                    let desc = (r.description && r.description !== '-') ? r.description : name;
+                    entries.push({ jsDate: r.jsDate, dateS, name: desc, type: 'ithara செலவு', varavu: 0, selavu: amt, entryType: 'selavu' });
+                }
+                // பழைய system: loan row-லேயே collectedVaddi / thirumbiyaAsalSum இருந்தா
+                // (தனி vaddi_vasool/asal_return rows இல்ல) → தனி entries-ஆ add பண்ணு
+                if (isLoanRow(at)) {
+                    let hasNewVaddi = allParsed.some(x => isVaddiRow(actTypeOf(x)) && parseInt(x.loanRefId||0) === parseInt(r.id||0));
+                    let hasNewAsal  = allParsed.some(x => isAsalRow(actTypeOf(x))  && parseInt(x.loanRefId||0) === parseInt(r.id||0));
+                    let oldVaddi = parseFloat(r.collectedVaddi    || 0);
+                    let oldAsal  = parseFloat(r.thirumbiyaAsalSum || 0);
+                    let ltLabel  = lt === 'yearly' ? '📆 Yearly' : '📅 Monthly';
+                    // வட்டி தேதி
+                    if (!hasNewVaddi && oldVaddi > 0) {
+                        let vDateStr = r.vaddiCollectedDate || r.lastCollectedDate || r.date || '-';
+                        let vJsDate  = parseRowDate(vDateStr);
+                        if (isNaN(vJsDate)) { vDateStr = r.date || '-'; vJsDate = r.jsDate; }
+                        if (vJsDate >= fromDate && vJsDate <= toDate) {
+                            entries.push({ jsDate: vJsDate, dateS: vDateStr, name, type: ltLabel + ' வட்டி வசூல்', varavu: oldVaddi, selavu: 0, entryType: 'vaddi' });
+                        }
+                    }
+                    // அசல் தேதி
+                    if (!hasNewAsal && oldAsal > 0) {
+                        let aDateStr = r.asalCollectedDate || r.lastCollectedDate || r.date || '-';
+                        let aJsDate  = parseRowDate(aDateStr);
+                        if (isNaN(aJsDate)) { aDateStr = r.date || '-'; aJsDate = r.jsDate; }
+                        if (aJsDate >= fromDate && aJsDate <= toDate) {
+                            entries.push({ jsDate: aJsDate, dateS: aDateStr, name, type: ltLabel + ' அசல் வாங்கியது', varavu: oldAsal, selavu: 0, entryType: 'asal' });
+                        }
                     }
                 }
             });
 
-            let nonLoanInRange = inRangeRows.filter(row => {
-                let actType = String(row.accounttype || '').toLowerCase().trim();
-                // ★ app_settings rows விலக்கு (capital, bank_balance, temple_details)
-                if (actType === 'app_settings') return false;
-                return !(actType === 'kadan' || actType === 'loan_given' || actType === 'varavu');
-            });
-
-            // Non-loan rows-ஐயும் entries-ஆக மாற்று
-            nonLoanInRange.forEach(row => {
-                let actType  = String(row.accounttype || '').toLowerCase().trim();
-                let isVaddiVasool = actType === 'vaddi_vasool';
-                let isAsalReturn  = actType === 'asal_return';
-                let isVaravu = actType === 'nankodai' || actType === 'varavu_idhar' || actType === 'varavu idhar';
-                let isSelavu = actType === 'sela_porul' || actType === 'selavu';
-                let name  = String(row.receiverName || row.name || 'விவரமில்லை');
-                let desc  = row.description || '-';
-                let amt   = parseFloat(row.amount || 0);
-                let dateStr = row.date || '-';
-                let lt    = String(row.loanType || 'monthly').toLowerCase().trim();
-                let ltLabel = lt === 'yearly' ? '📆 Yearly' : '📅 Monthly';
-
-                if (isVaddiVasool) {
-                    expandedEntries.push({
-                        jsDate: row.jsDate, type: 'vaddi',
-                        render: (bal) => {
-                            let newBal = bal + amt;
-                            return { bal: newBal, html: mkRow('#f0fff4', dateStr, name, ltLabel + ' வட்டி வசூல்', 0, amt, 0, 0, newBal) };
-                        }
-                    });
-                } else if (isAsalReturn) {
-                    expandedEntries.push({
-                        jsDate: row.jsDate, type: 'asal',
-                        render: (bal) => {
-                            let newBal = bal + amt;
-                            return { bal: newBal, html: mkRow('#e6f4ff', dateStr, name, ltLabel + ' அசல் திரும்பியது', amt, 0, 0, 0, newBal) };
-                        }
-                    });
-                } else {
-                    expandedEntries.push({
-                        jsDate: row.jsDate,
-                        type: isVaravu ? 'varavu' : 'selavu',
-                        render: (bal) => {
-                            let newBal = isVaravu ? bal + amt : bal - amt;
-                            // name மட்டும் காட்டு — description இருந்தால் அதையும் சேர்
-                            let displayLabel = isVaravu ? '🟢 வரவு' : '🔴 செலவு';
-                            let displayName  = desc && desc !== '-' ? desc : name;
-                            let html = isVaravu
-                                ? mkRow('#f0fff4', dateStr, displayName, displayLabel, 0, 0, amt, 0, newBal)
-                                : mkRow('#fff5f5', dateStr, displayName, displayLabel, 0, 0, 0, amt, newBal);
-                            return { bal: newBal, html };
-                        }
-                    });
-                }
-            });
-
-            // Date ascending sort (balance calculation-க்கு — பழையது முதல்)
-            expandedEntries.sort((a, b) => a.jsDate - b.jsDate);
-
-            // Step 1: பழையது முதல் balance calculate பண்ணு
-            stmtRowCounter = 0;
-            let currentBal = runningBalance;
-
-            let filteredEntries = expandedEntries.filter(entry => {
-                if (bankFilter === 'LOAN'   && entry.type !== 'loan_given' && entry.type !== 'vaddi' && entry.type !== 'asal') return false;
-                if (bankFilter === 'VARAVU' && entry.type !== 'varavu') return false;
-                if (bankFilter === 'SELAVU' && entry.type !== 'selavu') return false;
+            // ── Bank section filter ──
+            entries = entries.filter(e => {
+                if (bankFilter === 'LOAN'   && e.entryType !== 'loan_given' && e.entryType !== 'vaddi' && e.entryType !== 'asal') return false;
+                if (bankFilter === 'VARAVU' && e.entryType !== 'varavu') return false;
+                if (bankFilter === 'SELAVU' && e.entryType !== 'selavu') return false;
                 return true;
             });
 
-            let renderedRows = filteredEntries.map(entry => {
-                let result = entry.render(currentBal);
-                currentBal = result.bal;
-                return result.html;
+            // ── Sort ascending (oldest first) → calculate running balance ──
+            entries.sort((a, b) => a.jsDate - b.jsDate || 0);
+
+            let runBal = openingBal;
+            entries.forEach(e => {
+                runBal += e.varavu - e.selavu;
+                e.runBal = runBal;
             });
 
-            // Step 2: Opening balance row (கடைசியில் / கீழே காட்ட)
-            let openingRow = mkRow('#f0f4ff',
-                fromDateVal.split('-').reverse().join('.'),
+            // ── Render: latest first (reverse), opening balance at bottom ──
+            let rows = [...entries].reverse().map(e =>
+                mkRow6(
+                    e.entryType === 'loan_given' ? '#fff8f0' :
+                    e.entryType === 'selavu'     ? '#fff5f5' : '#f0fff4',
+                    e.dateS, e.name, e.type, e.varavu, e.selavu, e.runBal
+                )
+            );
+
+            // Opening balance row
+            let openFmt = fromDateVal.split('-').reverse().join('.');
+            rows.push(mkRow6('#eef2ff', openFmt,
                 'தொடக்க இருப்பு (Opening Balance)',
-                'ஆரம்ப முதலீடு: ₹' + openingCapital.toLocaleString('en-IN') + (capitalDate !== '—' ? ' (தேதி: ' + capitalDate + ')' : ''),
-                0, 0, 0, 0, runningBalance);
+                'ஆரம்ப முதலீடு: ₹' + openingCapital.toLocaleString('en-IN') + (capitalDateStr !== '—' ? ' (தேதி: ' + capitalDateStr + ')' : ''),
+                0, 0, openingBal));
 
-            // புதிய தேதி மேலே → பழைய தேதி கீழே → Opening balance கடைசி
-            let builtRows = [...renderedRows].reverse();
-            builtRows.push(openingRow);
+            document.getElementById('bankStatementBody').innerHTML =
+                rows.join('') || '<tr><td colspan="6" style="text-align:center;padding:16px;color:gray;">தரவுகள் எதுவும் இல்லை</td></tr>';
 
-            document.getElementById('bankStatementBody').innerHTML = builtRows.join('') || '<tr><td colspan="8" style="text-align:center;">தரவுகள் எதுவும் இல்லை</td></tr>';
-
-            generateKadanSummarySheet(sortedRows, fromDate, toDate);
+            generateKadanSummarySheet(
+                [...allRows].map(r => ({ ...r, jsDate: parseRowDate(r.date) })).filter(r => !isNaN(r.jsDate) && actTypeOf(r) !== 'app_settings').sort((a,b)=>a.jsDate-b.jsDate),
+                fromDate, toDate
+            );
             handleViewModeChange();
         }
 
