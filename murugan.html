@@ -2730,7 +2730,7 @@
             setInterval(function() {
                 lastFetchTime = 0; // cache invalidate
                 fetchDocs(true);
-            }, 3 * 60 * 1000);
+            }, 10 * 60 * 1000);
 
             // ★ Page visibility: tab/browser திரும்பி பார்க்கும்போது fresh data fetch
             document.addEventListener('visibilitychange', function() {
