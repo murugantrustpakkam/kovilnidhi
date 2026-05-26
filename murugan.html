@@ -108,9 +108,30 @@
             .dashboard-grid { grid-template-columns: 1fr; }
             .stat-value { font-size: 15px; }
         }
+
+        /* ===== ADMIN AUTH MODAL ===== */
+        @keyframes authFadeIn { from { opacity:0; transform: translateY(-16px); } to { opacity:1; transform:translateY(0); } }
     </style>
 </head>
 <body>
+
+
+    <!-- Admin login modal (hidden by default, triggered by 🔐 icon) -->
+    <div id="adminLoginModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.55); z-index:99999; align-items:center; justify-content:center;">
+        <div style="background:white; border-radius:16px; padding:32px 28px; width:100%; max-width:340px; box-shadow:0 20px 60px rgba(0,0,0,0.4); text-align:center; animation:authFadeIn 0.3s ease;">
+            <div style="font-size:40px; margin-bottom:6px;">🔐</div>
+            <h3 style="margin:0 0 4px 0; color:#2c3e50; font-size:18px;">Admin Login</h3>
+            <p style="color:#7f8c8d; font-size:12px; margin:0 0 20px 0;">நிர்வாகி உள்நுழைவு</p>
+            <input type="text" id="adminUsername" placeholder="Username" autocomplete="off"
+                style="width:100%; padding:11px 13px; border:2px solid #e2e8f0; border-radius:8px; font-size:14px; box-sizing:border-box; margin-bottom:10px; outline:none;">
+            <input type="password" id="adminPassword" placeholder="Password"
+                onkeydown="if(event.key==='Enter') doAdminLogin()"
+                style="width:100%; padding:11px 13px; border:2px solid #e2e8f0; border-radius:8px; font-size:14px; box-sizing:border-box; margin-bottom:4px; outline:none;">
+            <div id="adminLoginError" style="color:#dc3545; font-size:12px; font-weight:bold; margin-bottom:8px; display:none;">❌ தவறான username / password!</div>
+            <button onclick="doAdminLogin()" style="width:100%; padding:12px; background:linear-gradient(135deg,#2c3e50,#007bff); color:white; border:none; border-radius:8px; font-size:15px; font-weight:bold; cursor:pointer; margin-top:4px;">உள்நுழை</button>
+            <button onclick="closeAdminModal()" style="width:100%; padding:10px; background:#f8f9fa; color:#6c757d; border:1px solid #dee2e6; border-radius:8px; font-size:13px; cursor:pointer; margin-top:8px;">ரத்து</button>
+        </div>
+    </div>
 
     <!-- YouTube-style top loading bar -->
     <div id="ytLoader" style="position:fixed;top:0;left:0;height:3px;width:0%;background:linear-gradient(90deg,#ff6b35,#ffc107,#28a745);z-index:9999;transition:width 0.3s ease;box-shadow:0 0 8px rgba(255,107,53,0.6);display:none;"></div>
@@ -142,6 +163,26 @@
         </div>
 
       <div id="page1" class="page active">
+            <!-- Admin icon — top right corner of dashboard -->
+            <div style="display:flex; justify-content:flex-end; margin-bottom:6px;">
+                <div id="adminIconArea">
+                    <!-- Not logged in: show small lock icon to open admin login -->
+                    <button id="adminLoginIconBtn" onclick="openAdminModal()" title="Admin Login"
+                        style="background:none; border:none; cursor:pointer; padding:4px 8px; border-radius:8px; display:flex; align-items:center; gap:5px; color:#adb5bd; font-size:12px; transition:0.2s;"
+                        onmouseover="this.style.background='#f8f9fa'; this.style.color='#2c3e50';"
+                        onmouseout="this.style.background='none'; this.style.color='#adb5bd';">
+                        🔐 <span style="font-size:11px;">Admin</span>
+                    </button>
+                    <!-- Logged in as admin: show user badge + logout -->
+                    <div id="adminLoggedInArea" style="display:none; align-items:center; gap:8px;">
+                        <span style="background:#fff3cd; color:#856404; border-radius:10px; padding:4px 12px; font-size:12px; font-weight:bold;">👑 Admin</span>
+                        <button onclick="doAdminLogout()" title="Logout"
+                            style="background:#dc3545; color:white; border:none; border-radius:8px; padding:5px 10px; font-size:11px; font-weight:bold; cursor:pointer;">
+                            🚪 Logout
+                        </button>
+                    </div>
+                </div>
+            </div>
             <div class="dashboard-grid">
 
                 <!-- 1. மொத்த நிதி = Capital + வட்டி + Bank + நன்கொடை - செலவு -->
@@ -2701,14 +2742,95 @@
             showLoading(false);
         }
 
-        document.addEventListener('DOMContentLoaded', function() {
-            // ★ myCapital = 0 by default — fetchDocs()-ல் Sheet-இல் இருந்து load ஆகும்
-            // வேற system-ல் திறந்தால் localStorage இல்லை — அதனால் Sheet load முடியும் வரை
-            // dashboard-ல் ₹0 காட்டும், பிறகு correct value வரும்.
-            // localStorage இருந்தால் fast initial render மட்டும் — final value Sheet-இல் இருந்தே வரும்
-            myCapital = parseFloat(safeGetLocal('myCapital', '0') || 0);
+        // ===== AUTH SYSTEM =====
+        // Users: { username, password, role: 'admin' | 'user' }
+        // Admin = all pages; User = Dashboard (page1) + Statement (page5) only
+        // ===== ADMIN AUTH SYSTEM =====
+        // App is open to everyone by default (no login needed)
+        // Admin login → small 🔐 icon on dashboard top-right
+        // Admin ஆனால் எல்லா pages access; otherwise page2,3,4 hidden
 
-            // Settings page inputs pre-fill (localStorage cache — fast UX)
+        const ADMIN_USERS = [
+            { username: 'admin', password: 'temple@123' }
+            // மேலும் admin users சேர்க்க இங்கே add பண்ணுங்கள்
+        ];
+
+        let isAdmin = false;
+
+        function openAdminModal() {
+            document.getElementById('adminLoginModal').style.display = 'flex';
+            document.getElementById('adminUsername').focus();
+        }
+
+        function closeAdminModal() {
+            document.getElementById('adminLoginModal').style.display = 'none';
+            document.getElementById('adminLoginError').style.display = 'none';
+            document.getElementById('adminUsername').value = '';
+            document.getElementById('adminPassword').value = '';
+        }
+
+        function doAdminLogin() {
+            let uname = (document.getElementById('adminUsername').value || '').trim();
+            let pass  = (document.getElementById('adminPassword').value || '').trim();
+            let found = ADMIN_USERS.find(u => u.username === uname && u.password === pass);
+            if (!found) {
+                document.getElementById('adminLoginError').style.display = 'block';
+                document.getElementById('adminPassword').value = '';
+                return;
+            }
+            isAdmin = true;
+            safeSetLocal('isAdmin', '1');
+            closeAdminModal();
+            applyAdminState();
+            toast('👑 Admin mode activated!', 'info');
+        }
+
+        function doAdminLogout() {
+            isAdmin = false;
+            safeSetLocal('isAdmin', '0');
+            applyAdminState();
+            // If on restricted page, go to page1 directly (bypass patch)
+            let activePage = document.querySelector('.page.active');
+            let activeNum = activePage ? parseInt(activePage.id.replace('page','')) : 1;
+            if ([2,3,4].includes(activeNum)) {
+                document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+                document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+                let p1 = document.getElementById('page1');
+                let b1 = document.getElementById('btnPage1');
+                if (p1) p1.classList.add('active');
+                if (b1) b1.classList.add('active');
+            }
+            toast('Admin mode முடிந்தது.', 'info');
+        }
+
+        function applyAdminState() {
+            let adminPages = ['btnPage2','btnPage3','btnPage4'];
+            adminPages.forEach(function(id) {
+                let btn = document.getElementById(id);
+                if (btn) btn.style.display = isAdmin ? '' : 'none';
+            });
+            let loginBtn   = document.getElementById('adminLoginIconBtn');
+            let loggedArea = document.getElementById('adminLoggedInArea');
+            if (loginBtn)   loginBtn.style.display   = isAdmin ? 'none' : 'flex';
+            if (loggedArea) loggedArea.style.display  = isAdmin ? 'flex' : 'none';
+        }
+
+        // Patch switchPage to block non-admin from restricted pages
+        const _origSwitchPage = switchPage;
+        switchPage = function(n) {
+            if (!isAdmin && [2, 3, 4].includes(n)) {
+                toast('இந்த பக்கத்திற்கு Admin அனுமதி தேவை! 🔐', 'warn');
+                return;
+            }
+            _origSwitchPage(n);
+        };
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Restore admin session from localStorage
+            isAdmin = safeGetLocal('isAdmin', '0') === '1';
+
+            // Init app always (no login wall)
+            myCapital = parseFloat(safeGetLocal('myCapital', '0') || 0);
             let capInput = document.getElementById('inputCapital');
             if (capInput && myCapital > 0) capInput.value = myCapital;
             let capDateInput = document.getElementById('inputCapitalDate');
@@ -2722,26 +2844,25 @@
             loadTempleDetailsUI();
             applyAutoDate('loanDate');
             applyAutoDate('cbDate');
-            // ★ fetchDocs() → Sheet-இல் இருந்து capital load → myCapital update → calculateDashboard()
-            // இதுவே எல்லா systems-க்கும் correct value தரும்
             fetchDocs();
 
-            // ★ Auto-refresh: 3 நிமிடத்துக்கு ஒரு முறை — sheet-ல் யாராவது மாற்றினாலும் எல்லாருக்கும் தெரியும்
             setInterval(function() {
-                lastFetchTime = 0; // cache invalidate
+                lastFetchTime = 0;
                 fetchDocs(true);
             }, 10 * 60 * 1000);
 
-            // ★ Page visibility: tab/browser திரும்பி பார்க்கும்போது fresh data fetch
             document.addEventListener('visibilitychange', function() {
                 if (document.visibilityState === 'visible') {
                     let timeSinceFetch = Date.now() - lastFetchTime;
-                    if (timeSinceFetch > 60 * 1000) { // 1 நிமிடம் ஆனா refresh
+                    if (timeSinceFetch > 60 * 1000) {
                         lastFetchTime = 0;
                         fetchDocs(true);
                     }
                 }
             });
+
+            // Apply nav visibility based on admin state
+            applyAdminState();
         });
     </script>
 </body>
