@@ -1369,9 +1369,7 @@
                 let at  = actTypeOf(r);
                 let amt = parseFloat(r.amount || 0);
                 if (isLoanRow(at)) {
-                    // கடன் கொடுத்தோம் → cash குறைஞ்சது
                     openingBal -= amt;
-                    // பழைய system: தனி rows இல்லன்னா field-லேயே இருக்கும்
                     let hasNewVaddi = allParsed.some(x => isVaddiRow(actTypeOf(x)) && parseInt(x.loanRefId||0) === parseInt(r.id||0));
                     let hasNewAsal  = allParsed.some(x => isAsalRow(actTypeOf(x))  && parseInt(x.loanRefId||0) === parseInt(r.id||0));
                     if (!hasNewVaddi) openingBal += parseFloat(r.collectedVaddi    || 0);
@@ -1425,11 +1423,17 @@
                 }
 
                 if (isLoanRow(at)) {
-                    let loanAmt = parseFloat(r.amount || 0);
+                    let loanAmt = parseFloat(getRowValue(r, ['amount'], 0));
                     let ltLabel = lt === 'yearly' ? '📆 Yearly' : '📅 Monthly';
                     let status  = String(getRowValue(r, ['status'], 'active')).toLowerCase().trim();
-                    let closedLabel = status === 'closed' ? ' ✅ Closed' : '';
-                    entries.push({ jsDate: r.jsDate, dateS, name, type: ltLabel + ' கடன் வழங்கல்' + closedLabel, varavu: 0, selavu: loanAmt, entryType: 'loan_given' });
+                    let isClosed = status === 'closed';
+                    let closedLabel = isClosed ? ' ✅ Closed' : '';
+                    // Closed ஆனா → அசல் திரும்பியது row-லயே வரவு காட்டுவோம்
+                    // loan_given row-ல் selavu = 0 (already netted out via asal_return row)
+                    // Open-ஆ இருந்தா → selavu = loanAmt (cash இன்னும் வெளியே இருக்கு)
+                    let hasAsalReturn = allParsed.some(x => isAsalRow(actTypeOf(x)) && parseInt(x.loanRefId||0) === parseInt(r.id||0));
+                    let typeLabel = ltLabel + ' கடன் வழங்கல்' + (isClosed || hasAsalReturn ? ' ✅ Closed' : '');
+                    entries.push({ jsDate: r.jsDate, dateS, name, type: typeLabel, varavu: 0, selavu: loanAmt, entryType: 'loan_given' });
                 } else if (isVaddiRow(at)) {
                     let parent  = allParsed.find(x => isLoanRow(actTypeOf(x)) && parseInt(x.id||0) === parseInt(r.loanRefId||0));
                     let pLt     = parent ? String(getRowValue(parent,['loanType'],'monthly')).toLowerCase().trim() : lt;
