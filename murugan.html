@@ -1423,7 +1423,8 @@
                 }
 
                 if (isLoanRow(at)) {
-                    let loanAmt = parseFloat(getRowValue(r, ['amount'], 0));
+                    console.log('[LOAN KEYS]', JSON.stringify(Object.keys(r)), 'amount:', r.amount, 'loanAmount:', r.loanAmount, 'asalAmt:', r.asalAmt);
+                    let loanAmt = parseFloat(r.amount || r.loanAmount || r.asalAmt || r.Amount || 0);
                     let ltLabel = lt === 'yearly' ? '📆 Yearly' : '📅 Monthly';
                     let status  = String(getRowValue(r, ['status'], 'active')).toLowerCase().trim();
                     let isClosed = status === 'closed';
