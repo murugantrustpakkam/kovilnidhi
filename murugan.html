@@ -2294,6 +2294,7 @@
                             description: existingLoan.description ? (existingLoan.description + " | கூட்டு கடன்: " + desc) : desc,
                             date: date,
                             vaddiStatus: 'Pending'
+                            originalAmount: oldAmt + amt  // ← இந்த line மட்டும் add பண்ணுங்க
                         };
                         try {
                             await safePost({ action: "UPDATE", id: parseInt(existingLoan.id), sheet1: newCombinedPayload });
