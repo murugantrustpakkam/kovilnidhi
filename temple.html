@@ -1170,7 +1170,8 @@
 
             // ★ 25-நாள் சுழற்சி — base subtract approach (most reliable)
             let cycleVaddiBase    = parseFloat(safeGetLocal('cycleVaddiBase', '0') || 0);
-            let cycleResetDateStr = safeGetLocal('cycleResetDate', '');
+            let cycleResetDateStr  = safeGetLocal('cycleResetDate', '');
+            let yearlyResetDateStr = safeGetLocal('yearlyResetDate', '');
 
             // ★ Current calendar month (active date or today)
             let activeDateStr = getActiveDate(); // DD.MM.YYYY
@@ -1208,8 +1209,18 @@
                 } else if (actType === 'vaddi_vasool') {
                     totalVattiEarnedAllTime += amt;
                     let lt = String(getRowValue(row, ['loanType'], 'monthly')).toLowerCase().trim();
-                    if (lt === 'yearly') { yearVaddiYearly += amt; cycleVaddiYearly += amt; }
-                    else { yearVaddiMonthly += amt; cycleVaddiMonthly += amt; }
+                    // FIX: reset date-க்கு AFTER மட்டும் cycle/yearly split count பண்ணு
+                    let _cycleReset  = cycleResetDateStr  ? parseRowDate(cycleResetDateStr)  : null;
+                    let _yearlyReset = yearlyResetDateStr ? parseRowDate(yearlyResetDateStr) : null;
+                    let _afterCycle  = !_cycleReset  || isNaN(_cycleReset)  || (rdValid && rowDate >= _cycleReset);
+                    let _afterYearly = !_yearlyReset || isNaN(_yearlyReset) || (rdValid && rowDate >= _yearlyReset);
+                    if (lt === 'yearly') {
+                        if (_afterYearly) yearVaddiYearly  += amt;
+                        if (_afterCycle)  cycleVaddiYearly += amt;
+                    } else {
+                        if (_afterYearly) yearVaddiMonthly  += amt;
+                        if (_afterCycle)  cycleVaddiMonthly += amt;
+                    }
                 } else if (actType === 'asal_return') {
                     totalAsalReturnAllTime += amt;
                 } else if (actType === 'nankodai' || actType === 'varavu_idhar' || actType === 'varavu idhar') {
@@ -1226,11 +1237,10 @@
             });
 
             // ★ 25-நாள் சுழற்சி வட்டி = மொத்த வட்டி - reset நேரத்தில் இருந்த base
-            let cycleVaddi = Math.max(0, totalVattiEarnedAllTime - cycleVaddiBase);
-            // Monthly/Yearly proportional split
-            let _cycleRawTotal = cycleVaddiMonthly + cycleVaddiYearly;
-            let cycleMonthlyNet = _cycleRawTotal > 0 ? Math.round(cycleVaddi * cycleVaddiMonthly / _cycleRawTotal) : 0;
-            let cycleYearlyNet  = _cycleRawTotal > 0 ? Math.round(cycleVaddi * cycleVaddiYearly  / _cycleRawTotal) : 0;
+            // FIX: cycle values already date-filtered — direct use
+            let cycleVaddi      = cycleVaddiMonthly + cycleVaddiYearly;
+            let cycleMonthlyNet = cycleVaddiMonthly;
+            let cycleYearlyNet  = cycleVaddiYearly;
 
             // Yearly totals (yearly reset button ஆளுகை)
             let currentYearVaddi  = totalVattiEarnedAllTime - yearlyVaddiBase;  if (currentYearVaddi  < 0) currentYearVaddi  = 0;
@@ -1280,10 +1290,9 @@
             // Year vaddi breakdown — proportional split
             let ymEl = document.getElementById('dbYearMonthly');
             let yyEl = document.getElementById('dbYearYearly');
-            let yearVaddiMonthlyNet = Math.max(0, yearVaddiMonthly - (yearlyVaddiBase * (totalVattiEarnedAllTime > 0 ? yearVaddiMonthly / totalVattiEarnedAllTime : 0)));
-            let yearVaddiYearlyNet  = Math.max(0, yearVaddiYearly  - (yearlyVaddiBase * (totalVattiEarnedAllTime > 0 ? yearVaddiYearly  / totalVattiEarnedAllTime : 0)));
-            if (ymEl) ymEl.innerText = '₹' + Math.round(yearVaddiMonthlyNet).toLocaleString('en-IN');
-            if (yyEl) yyEl.innerText = '₹' + Math.round(yearVaddiYearlyNet).toLocaleString('en-IN');
+            // FIX: yearly values already date-filtered — direct use
+            if (ymEl) ymEl.innerText = '₹' + Math.round(yearVaddiMonthly).toLocaleString('en-IN');
+            if (yyEl) yyEl.innerText = '₹' + Math.round(yearVaddiYearly).toLocaleString('en-IN');
 
             // Sub-text labels update
             let cycleInfo = document.getElementById('dbCycleResetInfo');
@@ -2632,6 +2641,7 @@
             safeSetLocal('cycleVaravuBase',  String(totalVaravuAllTime));
             safeSetLocal('cycleSelavuBase',  String(totalSelavuAllTime));
             safeSetLocal('cycleResetDate',   getActiveDate());
+            safeSetLocal('yearlyResetDate',  getActiveDate());
 
             // Refresh myCapital from storage before recalculating
             myCapital = parseFloat(safeGetLocal('myCapital', '0') || 0);
