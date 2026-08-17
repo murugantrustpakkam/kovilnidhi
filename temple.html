@@ -1314,6 +1314,8 @@
 
             // ★ 25-நாள் சுழற்சி — base subtract approach (most reliable)
             let cycleVaddiBase    = parseFloat(safeGetLocal('cycleVaddiBase', '0') || 0);
+            let cycleVaravuBase   = parseFloat(safeGetLocal('cycleVaravuBase', '0') || 0);
+            let cycleSelavuBase   = parseFloat(safeGetLocal('cycleSelavuBase', '0') || 0);
             let cycleResetDateStr = safeGetLocal('cycleResetDate', '');
 
             // ★ Current calendar month (active date or today)
@@ -1330,8 +1332,6 @@
 
             // Counters
             let cycleVaddiMonthly = 0, cycleVaddiYearly = 0;
-            let monthVaravu = 0;
-            let monthSelavu = 0;
             let givenMonthly = 0, givenYearly = 0;
             let yearVaddiMonthly = 0, yearVaddiYearly = 0;
 
@@ -1358,14 +1358,8 @@
                     totalAsalReturnAllTime += amt;
                 } else if (actType === 'nankodai' || actType === 'varavu_idhar' || actType === 'varavu idhar') {
                     totalVaravuAllTime += amt;
-                    if (rdValid && rowDate.getMonth() === curMonth && rowDate.getFullYear() === curYear) {
-                        monthVaravu += amt;
-                    }
                 } else if (actType === 'sela_porul' || actType === 'selavu') {
                     totalSelavuAllTime += amt;
-                    if (rdValid && rowDate.getMonth() === curMonth && rowDate.getFullYear() === curYear) {
-                        monthSelavu += amt;
-                    }
                 }
             });
 
@@ -1375,6 +1369,11 @@
             let _cycleRawTotal = cycleVaddiMonthly + cycleVaddiYearly;
             let cycleMonthlyNet = _cycleRawTotal > 0 ? Math.round(cycleVaddi * cycleVaddiMonthly / _cycleRawTotal) : 0;
             let cycleYearlyNet  = _cycleRawTotal > 0 ? Math.round(cycleVaddi * cycleVaddiYearly  / _cycleRawTotal) : 0;
+
+            // ★ 25-நாள் சுழற்சி வரவு (நன்கொடை) & செலவு — cycleVaddi மாதிரியே base subtract பண்ணி கணக்கிடுறோம்
+            // (calendar-month filter இல்ல — reset பண்ணும்போது இந்த இரண்டும் சரியா 0 ஆக)
+            let cycleVaravu = Math.max(0, totalVaravuAllTime - cycleVaravuBase);
+            let cycleSelavu = Math.max(0, totalSelavuAllTime - cycleSelavuBase);
 
             // Yearly totals (yearly reset button ஆளுகை)
             let currentYearVaddi  = totalVattiEarnedAllTime - yearlyVaddiBase;  if (currentYearVaddi  < 0) currentYearVaddi  = 0;
@@ -1412,8 +1411,8 @@
 
             // ★ 3 date-based cards (localStorage base-ஐ நம்பவில்லை)
             document.getElementById('dbVaddiMonth').innerText       = '₹' + cycleVaddi.toLocaleString('en-IN');
-            document.getElementById('dbIdharVaravuMonth').innerText  = '₹' + monthVaravu.toLocaleString('en-IN');
-            document.getElementById('dbMonthSelavu').innerText       = '₹' + monthSelavu.toLocaleString('en-IN');
+            document.getElementById('dbIdharVaravuMonth').innerText  = '₹' + cycleVaravu.toLocaleString('en-IN');
+            document.getElementById('dbMonthSelavu').innerText       = '₹' + cycleSelavu.toLocaleString('en-IN');
 
             // Cycle breakdown — Monthly/Yearly
             let cmEl = document.getElementById('dbCycleMonthly');
@@ -3036,6 +3035,5 @@
     </script>
 </body>
 </html>
-
 
 
